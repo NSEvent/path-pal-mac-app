@@ -1,0 +1,788 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10001000000000000000001 /* PathPalApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20001000000000000000001 /* PathPalApp.swift */; };
+		A10002000000000000000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20002000000000000000002 /* AppDelegate.swift */; };
+		A10003000000000000000003 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20003000000000000000003 /* AppState.swift */; };
+		A10004000000000000000004 /* AccessibilityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20004000000000000000004 /* AccessibilityService.swift */; };
+		A10005000000000000000005 /* DialogNavigationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20005000000000000000005 /* DialogNavigationService.swift */; };
+		A10006000000000000000006 /* FinderWindowService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20006000000000000000006 /* FinderWindowService.swift */; };
+		A10007000000000000000007 /* FinderScriptingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20007000000000000000007 /* FinderScriptingService.swift */; };
+		A10008000000000000000008 /* RecentItemsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20008000000000000000008 /* RecentItemsService.swift */; };
+		A10009000000000000000009 /* MenuBarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20009000000000000000009 /* MenuBarService.swift */; };
+		A1000A00000000000000000A /* OverlayWindowService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000A00000000000000000A /* OverlayWindowService.swift */; };
+		A1000B00000000000000000B /* HotKeyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000B00000000000000000B /* HotKeyService.swift */; };
+		A1000C00000000000000000C /* PathBarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000C00000000000000000C /* PathBarService.swift */; };
+		A1000D00000000000000000D /* LaunchAtLoginService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000D00000000000000000D /* LaunchAtLoginService.swift */; };
+		A1000E00000000000000000E /* SettingsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000E00000000000000000E /* SettingsService.swift */; };
+		A1000F00000000000000000F /* PermissionsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000F00000000000000000F /* PermissionsService.swift */; };
+		A10010000000000000000010 /* RecentFolder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20010000000000000000010 /* RecentFolder.swift */; };
+		A10011000000000000000011 /* RecentFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20011000000000000000011 /* RecentFile.swift */; };
+		A10012000000000000000012 /* FinderWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20012000000000000000012 /* FinderWindow.swift */; };
+		A10013000000000000000013 /* DialogInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20013000000000000000013 /* DialogInfo.swift */; };
+		A10014000000000000000014 /* FolderTag.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20014000000000000000014 /* FolderTag.swift */; };
+		A10015000000000000000015 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20015000000000000000015 /* SettingsView.swift */; };
+		A10016000000000000000016 /* PathBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20016000000000000000016 /* PathBarView.swift */; };
+		A10017000000000000000017 /* OverlayPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20017000000000000000017 /* OverlayPanelView.swift */; };
+		A10018000000000000000018 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20018000000000000000018 /* OnboardingView.swift */; };
+		A10019000000000000000019 /* OverlayPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20019000000000000000019 /* OverlayPanel.swift */; };
+		A1001A00000000000000001A /* PathBarPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2001A00000000000000001A /* PathBarPanel.swift */; };
+		A1001B00000000000000001B /* HighlightWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2001B00000000000000001B /* HighlightWindow.swift */; };
+		A1001C00000000000000001C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2001C00000000000000001C /* Assets.xcassets */; };
+		A1002000000000000000002A /* RecentItemsServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2002000000000000000002A /* RecentItemsServiceTests.swift */; };
+		A10021000000000000000021 /* FinderWindowServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20021000000000000000021 /* FinderWindowServiceTests.swift */; };
+		A10022000000000000000022 /* FolderTagTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20022000000000000000022 /* FolderTagTests.swift */; };
+		A10023000000000000000023 /* SettingsServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20023000000000000000023 /* SettingsServiceTests.swift */; };
+		A10024000000000000000024 /* PathAutocompletionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20024000000000000000024 /* PathAutocompletionTests.swift */; };
+		A10025000000000000000025 /* DialogDetectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20025000000000000000025 /* DialogDetectionTests.swift */; };
+		A10030000000000000000030 /* FinderSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20030000000000000000030 /* FinderSync.swift */; };
+		A10031000000000000000031 /* PathPalFinderExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A30003000000000000000003 /* PathPalFinderExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A10040000000000000000040 /* ApplicationServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A20040000000000000000040 /* ApplicationServices.framework */; };
+		A10041000000000000000041 /* Carbon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A20041000000000000000041 /* Carbon.framework */; };
+		A10042000000000000000042 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A20042000000000000000042 /* AppKit.framework */; };
+		A10043000000000000000043 /* FinderSync.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A20043000000000000000043 /* FinderSync.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A40001000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A50001000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A90001000000000000000001;
+			remoteInfo = PathPal;
+		};
+		A40002000000000000000002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A50001000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A90003000000000000000003;
+			remoteInfo = PathPalFinderExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A60001000000000000000001 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				A10031000000000000000031 /* PathPalFinderExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		A20001000000000000000001 /* PathPalApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PathPalApp.swift; sourceTree = "<group>"; };
+		A20002000000000000000002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		A20003000000000000000003 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		A20004000000000000000004 /* AccessibilityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityService.swift; sourceTree = "<group>"; };
+		A20005000000000000000005 /* DialogNavigationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DialogNavigationService.swift; sourceTree = "<group>"; };
+		A20006000000000000000006 /* FinderWindowService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderWindowService.swift; sourceTree = "<group>"; };
+		A20007000000000000000007 /* FinderScriptingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderScriptingService.swift; sourceTree = "<group>"; };
+		A20008000000000000000008 /* RecentItemsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentItemsService.swift; sourceTree = "<group>"; };
+		A20009000000000000000009 /* MenuBarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarService.swift; sourceTree = "<group>"; };
+		A2000A00000000000000000A /* OverlayWindowService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayWindowService.swift; sourceTree = "<group>"; };
+		A2000B00000000000000000B /* HotKeyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotKeyService.swift; sourceTree = "<group>"; };
+		A2000C00000000000000000C /* PathBarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PathBarService.swift; sourceTree = "<group>"; };
+		A2000D00000000000000000D /* LaunchAtLoginService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginService.swift; sourceTree = "<group>"; };
+		A2000E00000000000000000E /* SettingsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsService.swift; sourceTree = "<group>"; };
+		A2000F00000000000000000F /* PermissionsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsService.swift; sourceTree = "<group>"; };
+		A20010000000000000000010 /* RecentFolder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentFolder.swift; sourceTree = "<group>"; };
+		A20011000000000000000011 /* RecentFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentFile.swift; sourceTree = "<group>"; };
+		A20012000000000000000012 /* FinderWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderWindow.swift; sourceTree = "<group>"; };
+		A20013000000000000000013 /* DialogInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DialogInfo.swift; sourceTree = "<group>"; };
+		A20014000000000000000014 /* FolderTag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderTag.swift; sourceTree = "<group>"; };
+		A20015000000000000000015 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A20016000000000000000016 /* PathBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PathBarView.swift; sourceTree = "<group>"; };
+		A20017000000000000000017 /* OverlayPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayPanelView.swift; sourceTree = "<group>"; };
+		A20018000000000000000018 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		A20019000000000000000019 /* OverlayPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayPanel.swift; sourceTree = "<group>"; };
+		A2001A00000000000000001A /* PathBarPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PathBarPanel.swift; sourceTree = "<group>"; };
+		A2001B00000000000000001B /* HighlightWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HighlightWindow.swift; sourceTree = "<group>"; };
+		A2001C00000000000000001C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A2001D00000000000000001D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A2001E00000000000000001E /* PathPal.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PathPal.entitlements; sourceTree = "<group>"; };
+		A2002000000000000000002A /* RecentItemsServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentItemsServiceTests.swift; sourceTree = "<group>"; };
+		A20021000000000000000021 /* FinderWindowServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderWindowServiceTests.swift; sourceTree = "<group>"; };
+		A20022000000000000000022 /* FolderTagTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderTagTests.swift; sourceTree = "<group>"; };
+		A20023000000000000000023 /* SettingsServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsServiceTests.swift; sourceTree = "<group>"; };
+		A20024000000000000000024 /* PathAutocompletionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PathAutocompletionTests.swift; sourceTree = "<group>"; };
+		A20025000000000000000025 /* DialogDetectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DialogDetectionTests.swift; sourceTree = "<group>"; };
+		A20030000000000000000030 /* FinderSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderSync.swift; sourceTree = "<group>"; };
+		A20031000000000000000031 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A20032000000000000000032 /* PathPalFinderExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PathPalFinderExtension.entitlements; sourceTree = "<group>"; };
+		A20040000000000000000040 /* ApplicationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ApplicationServices.framework; path = System/Library/Frameworks/ApplicationServices.framework; sourceTree = SDKROOT; };
+		A20041000000000000000041 /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = System/Library/Frameworks/Carbon.framework; sourceTree = SDKROOT; };
+		A20042000000000000000042 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
+		A20043000000000000000043 /* FinderSync.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = FinderSync.framework; path = System/Library/Frameworks/FinderSync.framework; sourceTree = SDKROOT; };
+		A30001000000000000000001 /* PathPal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PathPal.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A30002000000000000000002 /* PathPalTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PathPalTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A30003000000000000000003 /* PathPalFinderExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PathPalFinderExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A70001000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10040000000000000000040 /* ApplicationServices.framework in Frameworks */,
+				A10041000000000000000041 /* Carbon.framework in Frameworks */,
+				A10042000000000000000042 /* AppKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A70002000000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A70003000000000000000003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10043000000000000000043 /* FinderSync.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A80001000000000000000001 /* = Begin workspace root group = */ = {
+			isa = PBXGroup;
+			children = (
+				A80002000000000000000002 /* PathPal */,
+				A80008000000000000000008 /* PathPalTests */,
+				A80009000000000000000009 /* PathPalFinderExtension */,
+				A8000A00000000000000000A /* Frameworks */,
+				A8000B00000000000000000B /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A80002000000000000000002 /* PathPal */ = {
+			isa = PBXGroup;
+			children = (
+				A20001000000000000000001 /* PathPalApp.swift */,
+				A20002000000000000000002 /* AppDelegate.swift */,
+				A20003000000000000000003 /* AppState.swift */,
+				A80003000000000000000003 /* Services */,
+				A80004000000000000000004 /* Models */,
+				A80005000000000000000005 /* Views */,
+				A80006000000000000000006 /* Windows */,
+				A80007000000000000000007 /* Resources */,
+				A2001D00000000000000001D /* Info.plist */,
+				A2001E00000000000000001E /* PathPal.entitlements */,
+			);
+			path = PathPal;
+			sourceTree = "<group>";
+		};
+		A80003000000000000000003 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				A20004000000000000000004 /* AccessibilityService.swift */,
+				A20005000000000000000005 /* DialogNavigationService.swift */,
+				A20006000000000000000006 /* FinderWindowService.swift */,
+				A20007000000000000000007 /* FinderScriptingService.swift */,
+				A20008000000000000000008 /* RecentItemsService.swift */,
+				A20009000000000000000009 /* MenuBarService.swift */,
+				A2000A00000000000000000A /* OverlayWindowService.swift */,
+				A2000B00000000000000000B /* HotKeyService.swift */,
+				A2000C00000000000000000C /* PathBarService.swift */,
+				A2000D00000000000000000D /* LaunchAtLoginService.swift */,
+				A2000E00000000000000000E /* SettingsService.swift */,
+				A2000F00000000000000000F /* PermissionsService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		A80004000000000000000004 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				A20010000000000000000010 /* RecentFolder.swift */,
+				A20011000000000000000011 /* RecentFile.swift */,
+				A20012000000000000000012 /* FinderWindow.swift */,
+				A20013000000000000000013 /* DialogInfo.swift */,
+				A20014000000000000000014 /* FolderTag.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		A80005000000000000000005 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A20015000000000000000015 /* SettingsView.swift */,
+				A20016000000000000000016 /* PathBarView.swift */,
+				A20017000000000000000017 /* OverlayPanelView.swift */,
+				A20018000000000000000018 /* OnboardingView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		A80006000000000000000006 /* Windows */ = {
+			isa = PBXGroup;
+			children = (
+				A20019000000000000000019 /* OverlayPanel.swift */,
+				A2001A00000000000000001A /* PathBarPanel.swift */,
+				A2001B00000000000000001B /* HighlightWindow.swift */,
+			);
+			path = Windows;
+			sourceTree = "<group>";
+		};
+		A80007000000000000000007 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				A2001C00000000000000001C /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		A80008000000000000000008 /* PathPalTests */ = {
+			isa = PBXGroup;
+			children = (
+				A2002000000000000000002A /* RecentItemsServiceTests.swift */,
+				A20021000000000000000021 /* FinderWindowServiceTests.swift */,
+				A20022000000000000000022 /* FolderTagTests.swift */,
+				A20023000000000000000023 /* SettingsServiceTests.swift */,
+				A20024000000000000000024 /* PathAutocompletionTests.swift */,
+				A20025000000000000000025 /* DialogDetectionTests.swift */,
+			);
+			path = PathPalTests;
+			sourceTree = "<group>";
+		};
+		A80009000000000000000009 /* PathPalFinderExtension */ = {
+			isa = PBXGroup;
+			children = (
+				A20030000000000000000030 /* FinderSync.swift */,
+				A20031000000000000000031 /* Info.plist */,
+				A20032000000000000000032 /* PathPalFinderExtension.entitlements */,
+			);
+			path = PathPalFinderExtension;
+			sourceTree = "<group>";
+		};
+		A8000A00000000000000000A /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A20040000000000000000040 /* ApplicationServices.framework */,
+				A20041000000000000000041 /* Carbon.framework */,
+				A20042000000000000000042 /* AppKit.framework */,
+				A20043000000000000000043 /* FinderSync.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		A8000B00000000000000000B /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A30001000000000000000001 /* PathPal.app */,
+				A30002000000000000000002 /* PathPalTests.xctest */,
+				A30003000000000000000003 /* PathPalFinderExtension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A90001000000000000000001 /* PathPal */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AB0001000000000000000001 /* Build configuration list for PBXNativeTarget "PathPal" */;
+			buildPhases = (
+				AA0001000000000000000001 /* Sources */,
+				A70001000000000000000001 /* Frameworks */,
+				AA0004000000000000000004 /* Resources */,
+				A60001000000000000000001 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A40003000000000000000003 /* PBXTargetDependency */,
+			);
+			name = PathPal;
+			productName = PathPal;
+			productReference = A30001000000000000000001 /* PathPal.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A90002000000000000000002 /* PathPalTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AB0002000000000000000002 /* Build configuration list for PBXNativeTarget "PathPalTests" */;
+			buildPhases = (
+				AA0002000000000000000002 /* Sources */,
+				A70002000000000000000002 /* Frameworks */,
+				AA0005000000000000000005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A40004000000000000000004 /* PBXTargetDependency */,
+			);
+			name = PathPalTests;
+			productName = PathPalTests;
+			productReference = A30002000000000000000002 /* PathPalTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		A90003000000000000000003 /* PathPalFinderExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AB0003000000000000000003 /* Build configuration list for PBXNativeTarget "PathPalFinderExtension" */;
+			buildPhases = (
+				AA0003000000000000000003 /* Sources */,
+				A70003000000000000000003 /* Frameworks */,
+				AA0006000000000000000006 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PathPalFinderExtension;
+			productName = PathPalFinderExtension;
+			productReference = A30003000000000000000003 /* PathPalFinderExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A50001000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				ORGANIZATIONNAME = "Kevin Tang";
+				TargetAttributes = {
+					A90001000000000000000001 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					A90002000000000000000002 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = A90001000000000000000001;
+					};
+					A90003000000000000000003 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = AB0004000000000000000004 /* Build configuration list for PBXProject "PathPal" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A80001000000000000000001;
+			productRefGroup = A8000B00000000000000000B /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A90001000000000000000001 /* PathPal */,
+				A90002000000000000000002 /* PathPalTests */,
+				A90003000000000000000003 /* PathPalFinderExtension */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AA0004000000000000000004 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1001C00000000000000001C /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA0005000000000000000005 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA0006000000000000000006 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		AA0001000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10001000000000000000001 /* PathPalApp.swift in Sources */,
+				A10002000000000000000002 /* AppDelegate.swift in Sources */,
+				A10003000000000000000003 /* AppState.swift in Sources */,
+				A10004000000000000000004 /* AccessibilityService.swift in Sources */,
+				A10005000000000000000005 /* DialogNavigationService.swift in Sources */,
+				A10006000000000000000006 /* FinderWindowService.swift in Sources */,
+				A10007000000000000000007 /* FinderScriptingService.swift in Sources */,
+				A10008000000000000000008 /* RecentItemsService.swift in Sources */,
+				A10009000000000000000009 /* MenuBarService.swift in Sources */,
+				A1000A00000000000000000A /* OverlayWindowService.swift in Sources */,
+				A1000B00000000000000000B /* HotKeyService.swift in Sources */,
+				A1000C00000000000000000C /* PathBarService.swift in Sources */,
+				A1000D00000000000000000D /* LaunchAtLoginService.swift in Sources */,
+				A1000E00000000000000000E /* SettingsService.swift in Sources */,
+				A1000F00000000000000000F /* PermissionsService.swift in Sources */,
+				A10010000000000000000010 /* RecentFolder.swift in Sources */,
+				A10011000000000000000011 /* RecentFile.swift in Sources */,
+				A10012000000000000000012 /* FinderWindow.swift in Sources */,
+				A10013000000000000000013 /* DialogInfo.swift in Sources */,
+				A10014000000000000000014 /* FolderTag.swift in Sources */,
+				A10015000000000000000015 /* SettingsView.swift in Sources */,
+				A10016000000000000000016 /* PathBarView.swift in Sources */,
+				A10017000000000000000017 /* OverlayPanelView.swift in Sources */,
+				A10018000000000000000018 /* OnboardingView.swift in Sources */,
+				A10019000000000000000019 /* OverlayPanel.swift in Sources */,
+				A1001A00000000000000001A /* PathBarPanel.swift in Sources */,
+				A1001B00000000000000001B /* HighlightWindow.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA0002000000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1002000000000000000002A /* RecentItemsServiceTests.swift in Sources */,
+				A10021000000000000000021 /* FinderWindowServiceTests.swift in Sources */,
+				A10022000000000000000022 /* FolderTagTests.swift in Sources */,
+				A10023000000000000000023 /* SettingsServiceTests.swift in Sources */,
+				A10024000000000000000024 /* PathAutocompletionTests.swift in Sources */,
+				A10025000000000000000025 /* DialogDetectionTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA0003000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10030000000000000000030 /* FinderSync.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A40003000000000000000003 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A90003000000000000000003 /* PathPalFinderExtension */;
+			targetProxy = A40002000000000000000002 /* PBXContainerItemProxy */;
+		};
+		A40004000000000000000004 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A90001000000000000000001 /* PathPal */;
+			targetProxy = A40001000000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		AC0001000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		AC0002000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		AC0003000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = PathPal/PathPal.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 542GXYT5Z2;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PathPal/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = PathPal;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright 2026 Kevin Tang. All rights reserved.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kevintang.PathPal;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		AC0004000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = PathPal/PathPal.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 542GXYT5Z2;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PathPal/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = PathPal;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright 2026 Kevin Tang. All rights reserved.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kevintang.PathPal;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		AC0005000000000000000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 542GXYT5Z2;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kevintang.PathPalTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PathPal.app/Contents/MacOS/PathPal";
+			};
+			name = Debug;
+		};
+		AC0006000000000000000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 542GXYT5Z2;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kevintang.PathPalTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PathPal.app/Contents/MacOS/PathPal";
+			};
+			name = Release;
+		};
+		AC0007000000000000000007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = PathPalFinderExtension/PathPalFinderExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 542GXYT5Z2;
+				ENABLE_APP_SANDBOX = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PathPalFinderExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kevintang.PathPal.FinderExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		AC0008000000000000000008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = PathPalFinderExtension/PathPalFinderExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 542GXYT5Z2;
+				ENABLE_APP_SANDBOX = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PathPalFinderExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kevintang.PathPal.FinderExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		AB0001000000000000000001 /* Build configuration list for PBXNativeTarget "PathPal" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AC0003000000000000000003 /* Debug */,
+				AC0004000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AB0002000000000000000002 /* Build configuration list for PBXNativeTarget "PathPalTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AC0005000000000000000005 /* Debug */,
+				AC0006000000000000000006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AB0003000000000000000003 /* Build configuration list for PBXNativeTarget "PathPalFinderExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AC0007000000000000000007 /* Debug */,
+				AC0008000000000000000008 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AB0004000000000000000004 /* Build configuration list for PBXProject "PathPal" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AC0001000000000000000001 /* Debug */,
+				AC0002000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A50001000000000000000001 /* Project object */;
+}

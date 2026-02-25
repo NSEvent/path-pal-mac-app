@@ -1,13 +1,12 @@
 import AppKit
 import SwiftUI
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let appState = AppState()
     private var menuBarService: MenuBarService!
     private let recentItemsService = RecentItemsService()
     private let accessibilityService = AccessibilityService()
     private var overlayWindowService: OverlayWindowService!
-    private let hotKeyService = HotKeyService()
     private var pathBarPanel: PathBarPanel?
     private var finderPollingTimer: Timer?
     private var onboardingWindow: NSWindow?
@@ -19,9 +18,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Set up menu bar
         menuBarService = MenuBarService(appState: appState, recentItemsService: recentItemsService)
-        menuBarService.setup(onOpenSettings: { [weak self] in
-            self?.openSettings()
-        })
+        menuBarService.setup(
+            onOpenSettings: { [weak self] in self?.openSettings() },
+            onShowPathBar: { [weak self] in self?.showPathBar() }
+        )
 
         // Set up overlay service
         overlayWindowService = OverlayWindowService(appState: appState)
@@ -29,10 +29,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Check permissions and start services
         appState.isAccessibilityGranted = PermissionsService.shared.isAccessibilityGranted
 
+        // Always start services (they gracefully handle missing permissions)
+        startServices()
+
         if !SettingsService.shared.hasCompletedOnboarding {
             showOnboarding()
-        } else {
-            startServices()
         }
     }
 
@@ -54,12 +55,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Start Finder window polling
         startFinderPolling()
 
-        // Register Cmd+L hotkey
-        if SettingsService.shared.pathBarHotKeyEnabled {
-            hotKeyService.register { [weak self] in
-                self?.showPathBar()
-            }
-        }
+        // Register URL scheme handler for FinderSync toolbar button
+        NSAppleEventManager.shared().setEventHandler(
+            self,
+            andSelector: #selector(handleURLEvent(_:withReply:)),
+            forEventClass: AEEventClass(kInternetEventClass),
+            andEventID: AEEventID(kAEGetURL)
+        )
 
         // Update recent items from Finder
         updateRecentFromFinder()
@@ -88,6 +90,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // MARK: - URL Scheme Handler
+
+    @objc private func handleURLEvent(_ event: NSAppleEventDescriptor, withReply reply: NSAppleEventDescriptor) {
+        guard let urlString = event.paramDescriptor(forKeyword: AEKeyword(keyDirectObject))?.stringValue,
+              let url = URL(string: urlString) else { return }
+
+        if url.host == "pathbar" || url.path == "/pathbar" {
+            showPathBar()
+        }
+    }
+
     // MARK: - Path Bar
 
     private func showPathBar() {
@@ -104,6 +117,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.pathBarPanel?.close()
                 self?.pathBarPanel = nil
             },
+            onOpen: { [weak self] path, target in
+                self?.openPath(path, in: target)
+                self?.pathBarPanel?.close()
+                self?.pathBarPanel = nil
+            },
             onDismiss: { [weak self] in
                 self?.pathBarPanel?.close()
                 self?.pathBarPanel = nil
@@ -111,8 +129,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         panel.contentView = NSHostingView(rootView: pathBarView)
         panel.positionAboveFinderWindow()
+        NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
         pathBarPanel = panel
+    }
+
+    private func openPath(_ path: String, in target: OpenTarget) {
+        switch target {
+        case .finder:
+            NSWorkspace.shared.open(URL(fileURLWithPath: path))
+        case .iTerm:
+            let script = """
+            tell application "iTerm"
+                activate
+                if (count of windows) = 0 then
+                    create window with default profile
+                end if
+                tell current session of current window
+                    write text "cd \(path.replacingOccurrences(of: "\"", with: "\\\"").replacingOccurrences(of: " ", with: "\\\\ "))"
+                end tell
+            end tell
+            """
+            if let appleScript = NSAppleScript(source: script) {
+                var error: NSDictionary?
+                appleScript.executeAndReturnError(&error)
+            }
+        }
     }
 
     // MARK: - Settings
@@ -176,10 +218,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.onboardingWindow?.close()
             self?.onboardingWindow = nil
             self?.appState.hasCompletedOnboarding = true
-            self?.startServices()
+            SettingsService.shared.hasCompletedOnboarding = true
             NSApp.setActivationPolicy(.accessory)
         }))
         window.center()
+        window.delegate = self
 
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
@@ -187,9 +230,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         onboardingWindow = window
     }
 
+    func windowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow, window === onboardingWindow else { return }
+        onboardingWindow = nil
+        SettingsService.shared.hasCompletedOnboarding = true
+        NSApp.setActivationPolicy(.accessory)
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         accessibilityService.stop()
-        hotKeyService.unregister()
         finderPollingTimer?.invalidate()
         recentItemsService.save()
     }

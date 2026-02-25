@@ -4,7 +4,6 @@ import FinderSync
 class FinderSyncExtension: FIFinderSync {
     override init() {
         super.init()
-        // Watch all volumes
         FIFinderSyncController.default().directoryURLs = [URL(fileURLWithPath: "/")]
     }
 
@@ -13,7 +12,7 @@ class FinderSyncExtension: FIFinderSync {
     }
 
     override var toolbarItemToolTip: String {
-        return "Open PathPal"
+        return "Open PathPal path bar"
     }
 
     override var toolbarItemImage: NSImage {
@@ -23,23 +22,17 @@ class FinderSyncExtension: FIFinderSync {
     override func menu(for menuKind: FIMenuKind) -> NSMenu? {
         let menu = NSMenu(title: "PathPal")
 
-        let openItem = NSMenuItem(title: "Open in PathPal", action: #selector(openInPathPal(_:)), keyEquivalent: "")
-        openItem.target = self
-        menu.addItem(openItem)
+        let pathBarItem = NSMenuItem(title: "Open Path Bar", action: #selector(openPathBar(_:)), keyEquivalent: "")
+        pathBarItem.target = self
+        menu.addItem(pathBarItem)
 
         return menu
     }
 
-    @objc func openInPathPal(_ sender: Any?) {
-        guard let targetURL = FIFinderSyncController.default().targetedURL() else { return }
-
-        // Communicate with main app via shared UserDefaults
-        if let defaults = UserDefaults(suiteName: "com.kevintang.PathPal.group") {
-            defaults.set(targetURL.path, forKey: "lastFinderSyncPath")
-            defaults.synchronize()
+    @objc func openPathBar(_ sender: Any?) {
+        // Open path bar in main app via URL scheme
+        if let url = URL(string: "pathpal://pathbar") {
+            NSWorkspace.shared.open(url)
         }
-
-        // Launch or activate main app
-        NSWorkspace.shared.open(URL(string: "pathpal://open")!)
     }
 }

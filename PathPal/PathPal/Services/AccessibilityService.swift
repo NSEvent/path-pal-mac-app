@@ -3,6 +3,7 @@ import AppKit
 
 final class AccessibilityService {
     private var observers: [pid_t: AXObserver] = [:]
+    private var destructionObservers: [AXObserver] = []
     private var onDialogDetected: ((DialogInfo) -> Void)?
     private var onDialogDismissed: (() -> Void)?
 
@@ -41,6 +42,14 @@ final class AccessibilityService {
             )
         }
         observers.removeAll()
+        for observer in destructionObservers {
+            CFRunLoopRemoveSource(
+                CFRunLoopGetMain(),
+                AXObserverGetRunLoopSource(observer),
+                .defaultMode
+            )
+        }
+        destructionObservers.removeAll()
     }
 
     @objc private func appDidLaunch(_ notification: Notification) {
@@ -120,17 +129,21 @@ final class AccessibilityService {
         }
 
         // Watch for destruction
-        var observer: AXObserver?
+        var destructionObserver: AXObserver?
         let createResult = AXObserverCreate(pidValue, { (_, _, notification, refcon) in
             guard let refcon = refcon else { return }
             let service = Unmanaged<AccessibilityService>.fromOpaque(refcon).takeUnretainedValue()
-            service.onDialogDismissed?()
-        }, &observer)
+            DispatchQueue.main.async {
+                NSLog("[PathPal] Dialog dismissed")
+                service.onDialogDismissed?()
+            }
+        }, &destructionObserver)
 
-        if createResult == .success, let observer = observer {
+        if createResult == .success, let destructionObserver = destructionObserver {
             let refcon = Unmanaged.passUnretained(self).toOpaque()
-            AXObserverAddNotification(observer, element, kAXUIElementDestroyedNotification as CFString, refcon)
-            CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)
+            AXObserverAddNotification(destructionObserver, element, kAXUIElementDestroyedNotification as CFString, refcon)
+            CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(destructionObserver), .defaultMode)
+            self.destructionObservers.append(destructionObserver)
         }
     }
 

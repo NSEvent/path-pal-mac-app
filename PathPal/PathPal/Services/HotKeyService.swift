@@ -2,56 +2,53 @@ import Carbon
 import AppKit
 
 final class HotKeyService {
-    private var hotKeyRef: EventHotKeyRef?
-    private var eventHandler: EventHandlerRef?
+    private var globalMonitor: Any?
     private var onHotKey: (() -> Void)?
 
-    /// Register Cmd+L as a global hotkey.
+    private static func debugLog(_ message: String) {
+        let url = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/PathPal/debug.log")
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let line = "[\(timestamp)] \(message)\n"
+        if let handle = try? FileHandle(forWritingTo: url) {
+            handle.seekToEndOfFile()
+            handle.write(line.data(using: .utf8)!)
+            handle.closeFile()
+        } else {
+            try? line.write(to: url, atomically: true, encoding: .utf8)
+        }
+    }
+
+    /// Register Cmd+L as a hotkey that only fires when Finder is frontmost.
     func register(onHotKey: @escaping () -> Void) {
         self.onHotKey = onHotKey
 
-        var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        HotKeyService.debugLog("Registering Cmd+L via NSEvent global monitor")
 
-        let handler: EventHandlerUPP = { _, event, refcon -> OSStatus in
-            guard let refcon = refcon else { return OSStatus(eventNotHandledErr) }
-            let service = Unmanaged<HotKeyService>.fromOpaque(refcon).takeUnretainedValue()
-
-            // Only activate when Finder is frontmost
-            if let frontApp = NSWorkspace.shared.frontmostApplication,
-               frontApp.bundleIdentifier == "com.apple.finder" {
-                let callback = service.onHotKey
-                DispatchQueue.main.async {
-                    callback?()
-                }
+        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            // Check for Cmd+L only (command key, no shift/opt/ctrl)
+            guard flags == .command,
+                  event.keyCode == UInt16(kVK_ANSI_L) else {
+                return
             }
 
-            return noErr
+            if let frontApp = NSWorkspace.shared.frontmostApplication,
+               frontApp.bundleIdentifier == "com.apple.finder" {
+                HotKeyService.debugLog("Cmd+L fired in Finder — showing path bar")
+                self?.onHotKey?()
+            }
         }
 
-        let refcon = Unmanaged.passUnretained(self).toOpaque()
-        InstallEventHandler(GetApplicationEventTarget(), handler, 1, &eventType, refcon, &eventHandler)
-
-        // Cmd+L: key code 37 = 'L'
-        var hotKeyID = EventHotKeyID(signature: OSType(0x5050_414C), id: 1) // "PPAL"
-        RegisterEventHotKey(
-            UInt32(kVK_ANSI_L),
-            UInt32(cmdKey),
-            hotKeyID,
-            GetApplicationEventTarget(),
-            0,
-            &hotKeyRef
-        )
+        HotKeyService.debugLog("Cmd+L global monitor registered successfully")
     }
 
     func unregister() {
-        if let hotKeyRef = hotKeyRef {
-            UnregisterEventHotKey(hotKeyRef)
-            self.hotKeyRef = nil
+        if let monitor = globalMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalMonitor = nil
         }
-        if let eventHandler = eventHandler {
-            RemoveEventHandler(eventHandler)
-            self.eventHandler = nil
-        }
+        onHotKey = nil
     }
 
     deinit {

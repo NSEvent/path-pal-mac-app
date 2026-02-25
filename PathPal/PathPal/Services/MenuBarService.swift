@@ -5,6 +5,7 @@ final class MenuBarService: NSObject, NSMenuDelegate {
     private let appState: AppState
     private let recentItemsService: RecentItemsService
     private var onOpenSettings: (() -> Void)?
+    private var onShowPathBar: (() -> Void)?
 
     init(appState: AppState, recentItemsService: RecentItemsService) {
         self.appState = appState
@@ -12,8 +13,9 @@ final class MenuBarService: NSObject, NSMenuDelegate {
         super.init()
     }
 
-    func setup(onOpenSettings: @escaping () -> Void) {
+    func setup(onOpenSettings: @escaping () -> Void, onShowPathBar: @escaping () -> Void) {
         self.onOpenSettings = onOpenSettings
+        self.onShowPathBar = onShowPathBar
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem?.button {
@@ -79,6 +81,12 @@ final class MenuBarService: NSObject, NSMenuDelegate {
         }
         filesItem.submenu = filesSubmenu
         menu.addItem(filesItem)
+
+        menu.addItem(.separator())
+
+        let pathBarItem = NSMenuItem(title: "Go to Folder...", action: #selector(showPathBar), keyEquivalent: "")
+        pathBarItem.target = self
+        menu.addItem(pathBarItem)
 
         menu.addItem(.separator())
 
@@ -161,6 +169,10 @@ final class MenuBarService: NSObject, NSMenuDelegate {
         guard let path = sender.representedObject as? String else { return }
         recentItemsService.addFile(path)
         NSWorkspace.shared.open(URL(fileURLWithPath: path))
+    }
+
+    @objc private func showPathBar() {
+        onShowPathBar?()
     }
 
     @objc private func openSettings() {

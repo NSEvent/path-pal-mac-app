@@ -20,7 +20,10 @@ final class PathBarService {
             }
             return contents
                 .sorted { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }
-                .map { $0.path }
+                .map { item in
+                    let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+                    return isDir ? item.path + "/" : item.path
+                }
         }
 
         // Otherwise, complete the last component

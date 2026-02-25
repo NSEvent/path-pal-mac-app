@@ -28,6 +28,7 @@ enum HighlightColor: CaseIterable {
 /// Uses NSPanel with worksWhenModal so it's clickable during modal dialogs.
 final class HighlightWindow: NSPanel {
     var onClick: (() -> Void)?
+    var onRightClick: (() -> Void)?
     var finderPath: String { finderWindowInfo.path }
     private let finderWindowInfo: FinderWindow
 
@@ -71,6 +72,7 @@ final class HighlightWindow: NSPanel {
                                  folderName: displayName,
                                  color: color)
         view.onClick = { [weak self] in self?.onClick?() }
+        view.onRightClick = { [weak self] in self?.onRightClick?() }
         contentView = view
     }
 
@@ -101,6 +103,7 @@ final class HighlightWindow: NSPanel {
 
 class HighlightView: NSView {
     var onClick: (() -> Void)?
+    var onRightClick: (() -> Void)?
     private var isHovering = false
     private let pillView: NSView
     private let highlightColor: HighlightColor
@@ -191,6 +194,10 @@ class HighlightView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         onClick?()
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        onRightClick?()
     }
 
     override func draw(_ dirtyRect: NSRect) {

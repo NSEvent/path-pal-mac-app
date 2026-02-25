@@ -161,6 +161,10 @@ final class OverlayWindowService {
                     debugLog("Highlight click: \(fw.title) path=\(fw.path)")
                     self.navigateDialog(toPath: fw.path)
                 }
+                hw.onRightClick = { [weak self, weak hw] in
+                    guard let self = self, let hw = hw else { return }
+                    self.dismissHighlightWindow(hw)
+                }
                 hw.orderFrontRegardless()
                 highlightWindows.append(hw)
             }
@@ -233,6 +237,12 @@ final class OverlayWindowService {
             remaining = next.filter { $0.width > 10 && $0.height > 10 }  // Skip tiny slivers
         }
         return remaining
+    }
+
+    private func dismissHighlightWindow(_ hw: HighlightWindow) {
+        hw.close()
+        highlightWindows.removeAll { $0 === hw }
+        hideTooltip()
     }
 
     private func hideHighlightWindows() {

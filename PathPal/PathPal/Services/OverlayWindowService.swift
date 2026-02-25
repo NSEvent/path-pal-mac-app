@@ -19,11 +19,14 @@ private func debugLog(_ message: String) {
 
 final class OverlayWindowService {
     private var overlayPanel: OverlayPanel?
+    private var isShowingOverlay = false  // Guards against race during async overlay creation
     private var tooltipPanel: NSPanel?
+    private var highlightWindows: [HighlightWindow] = []
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var moveMonitor: Any?
     private var currentDialog: DialogInfo?
+    private var dialogBoundsCG: CGRect = .zero  // Dialog bounds in CG coords (top-left origin)
     private var finderWindows: [(name: String, path: String, bounds: CGRect)] = []
     private let appState: AppState
     private let dialogNavigationService = DialogNavigationService()
@@ -33,8 +36,9 @@ final class OverlayWindowService {
     }
 
     func showOverlay(for dialog: DialogInfo) {
-        // If an overlay is already showing, don't create another one
-        if overlayPanel != nil { return }
+        // If an overlay is already showing or being created, don't create another one
+        if overlayPanel != nil || isShowingOverlay { return }
+        isShowingOverlay = true
 
         currentDialog = dialog
 
@@ -78,6 +82,11 @@ final class OverlayWindowService {
                 debugLog("Overlay panel shown, isVisible=\(panel.isVisible), level=\(panel.level.rawValue), frame=\(panel.frame)")
                 self.overlayPanel = panel
 
+                // Show highlight overlays on Finder windows
+                if SettingsService.shared.highlightFinderWindows {
+                    self.showHighlightWindows()
+                }
+
                 // Start CGEvent tap for click interception + move monitor for tooltips
                 self.startEventTap()
                 self.startMoveMonitor()
@@ -88,11 +97,97 @@ final class OverlayWindowService {
     func hideOverlay() {
         overlayPanel?.close()
         overlayPanel = nil
+        isShowingOverlay = false
+        hideHighlightWindows()
         stopEventTap()
         stopMoveMonitor()
         hideTooltip()
         currentDialog = nil
+        dialogBoundsCG = .zero
         finderWindows = []
+    }
+
+    // MARK: - Finder Window Highlights
+
+    private func showHighlightWindows() {
+        hideHighlightWindows()
+
+        // Get dialog bounds in CG coords (top-left origin) to exclude overlap
+        // Also include the overlay panel bounds
+        var excludeRects: [CGRect] = []
+        if !dialogBoundsCG.isEmpty {
+            excludeRects.append(dialogBoundsCG)
+        }
+        if let panel = overlayPanel, let screen = NSScreen.main {
+            let pf = panel.frame
+            let cgY = screen.frame.height - pf.origin.y - pf.height
+            excludeRects.append(CGRect(x: pf.origin.x, y: cgY, width: pf.width, height: pf.height))
+        }
+
+        for fw in appState.finderWindows {
+            // Compute visible portion of this Finder window (exclude dialog/overlay overlap)
+            let visibleBounds = subtractRects(from: fw.bounds, excluding: excludeRects)
+            if visibleBounds.isEmpty { continue }
+
+            // Create highlight windows for each visible region
+            for region in visibleBounds {
+                let clippedFW = FinderWindow(windowID: fw.windowID, title: fw.title, bounds: region, path: fw.path)
+                let hw = HighlightWindow(finderWindow: clippedFW)
+                hw.onClick = { [weak self] in
+                    debugLog("Highlight click: \(fw.title) path=\(fw.path)")
+                    self?.navigateDialog(toPath: fw.path)
+                }
+                hw.orderFrontRegardless()
+                highlightWindows.append(hw)
+            }
+        }
+        debugLog("Showed \(highlightWindows.count) highlight windows (excluding dialog overlap)")
+    }
+
+    /// Subtract excluding rects from a source rect, returning visible regions.
+    /// Uses a simple approach: split horizontally/vertically around each exclusion.
+    private func subtractRects(from source: CGRect, excluding: [CGRect]) -> [CGRect] {
+        var remaining = [source]
+        for excl in excluding {
+            var next: [CGRect] = []
+            for rect in remaining {
+                let intersection = rect.intersection(excl)
+                if intersection.isNull || intersection.isEmpty {
+                    next.append(rect)
+                    continue
+                }
+                // Split into up to 4 pieces: top, bottom, left, right of the exclusion
+                // Top strip (above exclusion)
+                if intersection.minY > rect.minY {
+                    next.append(CGRect(x: rect.minX, y: rect.minY,
+                                       width: rect.width, height: intersection.minY - rect.minY))
+                }
+                // Bottom strip (below exclusion)
+                if intersection.maxY < rect.maxY {
+                    next.append(CGRect(x: rect.minX, y: intersection.maxY,
+                                       width: rect.width, height: rect.maxY - intersection.maxY))
+                }
+                // Left strip (within exclusion's Y range)
+                if intersection.minX > rect.minX {
+                    next.append(CGRect(x: rect.minX, y: intersection.minY,
+                                       width: intersection.minX - rect.minX, height: intersection.height))
+                }
+                // Right strip (within exclusion's Y range)
+                if intersection.maxX < rect.maxX {
+                    next.append(CGRect(x: intersection.maxX, y: intersection.minY,
+                                       width: rect.maxX - intersection.maxX, height: intersection.height))
+                }
+            }
+            remaining = next.filter { $0.width > 10 && $0.height > 10 }  // Skip tiny slivers
+        }
+        return remaining
+    }
+
+    private func hideHighlightWindows() {
+        for hw in highlightWindows {
+            hw.close()
+        }
+        highlightWindows.removeAll()
     }
 
     private func navigateDialog(toPath path: String) {
@@ -158,18 +253,22 @@ final class OverlayWindowService {
 
     private func checkClickOnFinderWindow(at cgPoint: CGPoint) {
         guard currentDialog != nil, !finderWindows.isEmpty else { return }
+        guard let screen = NSScreen.main else { return }
 
-        // Don't intercept clicks on the overlay panel itself
+        // Don't intercept clicks on the overlay panel
         if let panel = overlayPanel {
-            let panelFrame = panel.frame
-            guard let screen = NSScreen.main else { return }
-            // Convert panel frame (Cocoa bottom-left) to CG (top-left)
-            let cgPanelY = screen.frame.height - panelFrame.origin.y - panelFrame.height
-            let cgPanelRect = CGRect(x: panelFrame.origin.x, y: cgPanelY,
-                                     width: panelFrame.width, height: panelFrame.height)
-            if cgPanelRect.contains(cgPoint) {
-                return
-            }
+            let pf = panel.frame
+            let cgPanelY = screen.frame.height - pf.origin.y - pf.height
+            let cgPanelRect = CGRect(x: pf.origin.x, y: cgPanelY, width: pf.width, height: pf.height)
+            if cgPanelRect.contains(cgPoint) { return }
+        }
+
+        // Don't intercept clicks on highlight windows — they handle clicks themselves
+        for hw in highlightWindows {
+            let hf = hw.frame
+            let cgHwY = screen.frame.height - hf.origin.y - hf.height
+            let cgHwRect = CGRect(x: hf.origin.x, y: cgHwY, width: hf.width, height: hf.height)
+            if cgHwRect.contains(cgPoint) { return }
         }
 
         // Check if click landed on any Finder window (bounds are already in CG top-left coords)
@@ -212,19 +311,28 @@ final class OverlayWindowService {
         let cgY = screen.frame.height - mouseLocation.y
         let cgPoint = CGPoint(x: mouseLocation.x, y: cgY)
 
-        // Log mouse position periodically for debugging
-        if Date().timeIntervalSince(lastLoggedMove) > 2.0 {
-            lastLoggedMove = Date()
-            debugLog("Mouse at CG(\(Int(cgPoint.x)), \(Int(cgPoint.y))) Cocoa(\(Int(mouseLocation.x)), \(Int(mouseLocation.y))) — checking \(finderWindows.count) Finder windows")
-        }
-
         // Don't show tooltip over the overlay panel
         if let panel = overlayPanel, panel.frame.contains(mouseLocation) {
             hideTooltip()
             return
         }
 
-        if let matched = finderWindows.first(where: { $0.bounds.contains(cgPoint) }) {
+        // Match against highlight windows (what the user actually sees and clicks)
+        // so the tooltip path always matches the click navigation path
+        for hw in highlightWindows {
+            let hf = hw.frame
+            let cgHwY = screen.frame.height - hf.origin.y - hf.height
+            let cgHwRect = CGRect(x: hf.origin.x, y: cgHwY, width: hf.width, height: hf.height)
+            if cgHwRect.contains(cgPoint) {
+                let path = hw.finderPath
+                let name = URL(fileURLWithPath: path).lastPathComponent
+                showTooltip(for: (name: name, path: path, bounds: cgHwRect), at: mouseLocation)
+                return
+            }
+        }
+
+        // Fall back to raw Finder window bounds (for when highlights are disabled)
+        if highlightWindows.isEmpty, let matched = finderWindows.first(where: { $0.bounds.contains(cgPoint) }) {
             showTooltip(for: matched, at: mouseLocation)
         } else {
             hideTooltip()
@@ -320,6 +428,9 @@ final class OverlayWindowService {
         }
 
         debugLog("positionOverlay: dialog at (\(dialogOrigin.x), \(dialogOrigin.y)) size (\(dialogSize.width) x \(dialogSize.height))")
+
+        // Store dialog bounds in CG coords (top-left origin) for highlight clipping
+        dialogBoundsCG = CGRect(origin: dialogOrigin, size: dialogSize)
 
         let panelWidth: CGFloat = 260
         let panelHeight: CGFloat = 400

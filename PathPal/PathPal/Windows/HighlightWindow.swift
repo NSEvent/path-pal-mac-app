@@ -4,6 +4,7 @@ import AppKit
 /// Uses NSPanel with worksWhenModal so it's clickable during modal dialogs.
 final class HighlightWindow: NSPanel {
     var onClick: (() -> Void)?
+    var finderPath: String { finderWindowInfo.path }
     private let finderWindowInfo: FinderWindow
 
     init(finderWindow: FinderWindow) {

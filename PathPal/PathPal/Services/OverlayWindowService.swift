@@ -112,43 +112,20 @@ final class OverlayWindowService {
     private func showHighlightWindows() {
         hideHighlightWindows()
 
-        // Build exclusion rects from CGWindowList (accurate on-screen bounds)
-        // so highlights don't cover the dialog. We only exclude the dialog
-        // window itself (smallest window containing the dialog center), NOT
-        // the parent app window behind it.
         var excludeRects: [CGRect] = []
-        let dialogCenter = CGPoint(x: dialogBoundsCG.midX, y: dialogBoundsCG.midY)
 
         if let dialog = currentDialog,
            let windowList = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] {
-            // Collect all windows from the dialog's PID that contain the dialog center
-            var candidateRects: [CGRect] = []
+            var pidRects: [CGRect] = []
             for entry in windowList {
                 guard let pidVal = entry[kCGWindowOwnerPID as String] as? Int,
                       pid_t(pidVal) == dialog.pid,
                       let boundsDict = entry[kCGWindowBounds as String] as? [String: CGFloat],
                       let x = boundsDict["X"], let y = boundsDict["Y"],
                       let w = boundsDict["Width"], let h = boundsDict["Height"] else { continue }
-                let rect = CGRect(x: x, y: y, width: w, height: h)
-                if rect.contains(dialogCenter) {
-                    candidateRects.append(rect)
-                    debugLog("Candidate rect (PID \(dialog.pid)): (\(x),\(y),\(w),\(h)) area=\(w*h)")
-                }
+                pidRects.append(CGRect(x: x, y: y, width: w, height: h))
             }
-            // Exclude all dialog-related windows EXCEPT the largest one (the parent app window).
-            // This clips highlights around the dialog sheet and any sub-panels,
-            // but lets highlights still appear over the parent app window.
-            if candidateRects.count > 1 {
-                let maxArea = candidateRects.map { $0.width * $0.height }.max() ?? 0
-                for rect in candidateRects where rect.width * rect.height < maxArea {
-                    excludeRects.append(rect.insetBy(dx: -4, dy: -4))
-                    debugLog("Exclude dialog rect: \(rect)")
-                }
-            } else if let only = candidateRects.first {
-                // Only one window (dialog IS the top-level window) — exclude it
-                excludeRects.append(only.insetBy(dx: -4, dy: -4))
-                debugLog("Exclude single dialog rect: \(only)")
-            }
+            excludeRects = Self.dialogExclusionRects(dialogBounds: dialogBoundsCG, pidRects: pidRects)
         }
 
         // Also exclude the overlay sidebar panel
@@ -181,6 +158,27 @@ final class OverlayWindowService {
         }
 
         debugLog("Showed \(highlightWindows.count) highlight windows (clipped around \(excludeRects.count) exclusion rects)")
+    }
+
+    /// Determine which windows from the dialog's PID should be excluded from highlights.
+    /// Excludes any PID window that overlaps significantly (>10% of its area) with the
+    /// dialog bounds, plus 20px padding for shadows. This catches the dialog itself,
+    /// its parent app window, toolbars, and other overlapping app windows — but not
+    /// unrelated windows from the same app at different screen positions.
+    static func dialogExclusionRects(dialogBounds: CGRect, pidRects: [CGRect]) -> [CGRect] {
+        guard !dialogBounds.isEmpty else { return [] }
+        var result: [CGRect] = []
+        for rect in pidRects {
+            let intersection = rect.intersection(dialogBounds)
+            guard !intersection.isNull && !intersection.isEmpty else { continue }
+            let overlapArea = intersection.width * intersection.height
+            let windowArea = rect.width * rect.height
+            guard windowArea > 0 else { continue }
+            if overlapArea / windowArea > 0.1 {
+                result.append(rect.insetBy(dx: -20, dy: -20))
+            }
+        }
+        return result
     }
 
     /// Subtract excluding rects from a source rect, returning visible regions.

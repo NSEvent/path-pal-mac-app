@@ -228,4 +228,146 @@ final class OverlayWindowServiceTests: XCTestCase {
         assertAllContained(in: source, rects: result)
         assertNoneOverlap(with: exclusion, rects: result)
     }
+
+    // MARK: - Dialog Exclusion Rects (real data from Chrome + multiple overlapping windows)
+
+    /// Real data from user session: dialog at (558,201,1312,687), 5 Chrome PID windows.
+    /// Window [3] is a huge unrelated Chrome window that barely touches the dialog.
+    private let realDialogBounds = CGRect(x: 558, y: 201, width: 1312, height: 687)
+    private let realPidRects: [CGRect] = [
+        CGRect(x: 558, y: 201, width: 1312, height: 687),   // [0] dialog sheet
+        CGRect(x: 1127, y: 290, width: 403, height: 84),    // [1] toolbar
+        CGRect(x: 534, y: 118, width: 1360, height: 764),   // [2] Chrome parent
+        CGRect(x: -1, y: 862, width: 2026, height: 1240),   // [3] unrelated Chrome window
+        CGRect(x: 566, y: 194, width: 1024, height: 822),   // [4] overlapping Chrome window
+    ]
+    private let realFinderWindows: [CGRect] = [
+        CGRect(x: 190, y: 221, width: 1412, height: 644),   // Downloads
+        CGRect(x: 535, y: 344, width: 1286, height: 1003),  // Applications
+        CGRect(x: 102, y: 534, width: 1135, height: 734),   // applescript
+        CGRect(x: 232, y: 641, width: 1119, height: 511),   // Applications (user)
+    ]
+
+    func testDialogExclusionIncludesDialogSheet() {
+        let exclusions = OverlayWindowService.dialogExclusionRects(
+            dialogBounds: realDialogBounds, pidRects: realPidRects)
+        // The dialog sheet [0] overlaps 100% with itself — must be excluded
+        XCTAssertTrue(exclusions.contains { $0.contains(realPidRects[0]) },
+            "Dialog sheet must be excluded")
+    }
+
+    func testDialogExclusionIncludesToolbar() {
+        let exclusions = OverlayWindowService.dialogExclusionRects(
+            dialogBounds: realDialogBounds, pidRects: realPidRects)
+        // Toolbar [1] is fully within the dialog — must be excluded
+        XCTAssertTrue(exclusions.contains { $0.contains(realPidRects[1]) },
+            "Toolbar must be excluded")
+    }
+
+    func testDialogExclusionIncludesChromeParent() {
+        let exclusions = OverlayWindowService.dialogExclusionRects(
+            dialogBounds: realDialogBounds, pidRects: realPidRects)
+        // Chrome parent [2] overlaps ~87% — must be excluded
+        XCTAssertTrue(exclusions.contains { $0.contains(realPidRects[2]) },
+            "Chrome parent must be excluded")
+    }
+
+    func testDialogExclusionIncludesOverlappingChromeWindow() {
+        let exclusions = OverlayWindowService.dialogExclusionRects(
+            dialogBounds: realDialogBounds, pidRects: realPidRects)
+        // Window [4] overlaps ~84% — must be excluded
+        XCTAssertTrue(exclusions.contains { $0.contains(realPidRects[4]) },
+            "Overlapping Chrome window must be excluded")
+    }
+
+    func testDialogExclusionExcludesUnrelatedChromeWindow() {
+        let exclusions = OverlayWindowService.dialogExclusionRects(
+            dialogBounds: realDialogBounds, pidRects: realPidRects)
+        // Window [3] only overlaps ~1.4% — must NOT be excluded
+        XCTAssertFalse(exclusions.contains { $0.contains(realPidRects[3]) },
+            "Unrelated Chrome window at different position must not be excluded")
+    }
+
+    func testDialogExclusionEmptyDialog() {
+        let exclusions = OverlayWindowService.dialogExclusionRects(
+            dialogBounds: .zero, pidRects: realPidRects)
+        XCTAssertTrue(exclusions.isEmpty)
+    }
+
+    func testDialogExclusionNoPidWindows() {
+        let exclusions = OverlayWindowService.dialogExclusionRects(
+            dialogBounds: realDialogBounds, pidRects: [])
+        XCTAssertTrue(exclusions.isEmpty)
+    }
+
+    func testHighlightsNeverOverlapExcludedRects() {
+        let exclusions = OverlayWindowService.dialogExclusionRects(
+            dialogBounds: realDialogBounds, pidRects: realPidRects)
+        for finderBounds in realFinderWindows {
+            let visibleRegions = service.subtractRects(from: finderBounds, excluding: exclusions)
+            for region in visibleRegions {
+                for excl in exclusions {
+                    let intersection = region.intersection(excl)
+                    XCTAssertTrue(
+                        intersection.isNull || intersection.isEmpty,
+                        "Highlight region \(region) overlaps exclusion \(excl)")
+                }
+            }
+        }
+    }
+
+    func testHighlightsNeverOverlapDialogBounds() {
+        let exclusions = OverlayWindowService.dialogExclusionRects(
+            dialogBounds: realDialogBounds, pidRects: realPidRects)
+        for finderBounds in realFinderWindows {
+            let visibleRegions = service.subtractRects(from: finderBounds, excluding: exclusions)
+            for region in visibleRegions {
+                let intersection = region.intersection(realDialogBounds)
+                XCTAssertTrue(
+                    intersection.isNull || intersection.isEmpty,
+                    "Highlight region \(region) overlaps dialog \(realDialogBounds)")
+            }
+        }
+    }
+
+    func testHighlightsNeverOverlapChromeParent() {
+        let exclusions = OverlayWindowService.dialogExclusionRects(
+            dialogBounds: realDialogBounds, pidRects: realPidRects)
+        let chromeParent = realPidRects[2]
+        for finderBounds in realFinderWindows {
+            let visibleRegions = service.subtractRects(from: finderBounds, excluding: exclusions)
+            for region in visibleRegions {
+                let intersection = region.intersection(chromeParent)
+                XCTAssertTrue(
+                    intersection.isNull || intersection.isEmpty,
+                    "Highlight region \(region) overlaps Chrome parent \(chromeParent)")
+            }
+        }
+    }
+
+    func testHighlightsNeverOverlapOverlappingChromeWindow() {
+        let exclusions = OverlayWindowService.dialogExclusionRects(
+            dialogBounds: realDialogBounds, pidRects: realPidRects)
+        let chromeWindow4 = realPidRects[4]
+        for finderBounds in realFinderWindows {
+            let visibleRegions = service.subtractRects(from: finderBounds, excluding: exclusions)
+            for region in visibleRegions {
+                let intersection = region.intersection(chromeWindow4)
+                XCTAssertTrue(
+                    intersection.isNull || intersection.isEmpty,
+                    "Highlight region \(region) overlaps Chrome window [4] \(chromeWindow4)")
+            }
+        }
+    }
+
+    func testHighlightsStillExistOutsideChrome() {
+        let exclusions = OverlayWindowService.dialogExclusionRects(
+            dialogBounds: realDialogBounds, pidRects: realPidRects)
+        // Downloads window at (190,221,1412,644) extends to the left of Chrome (x=534).
+        // There should be visible highlight regions.
+        let downloadsRegions = service.subtractRects(
+            from: realFinderWindows[0], excluding: exclusions)
+        XCTAssertFalse(downloadsRegions.isEmpty,
+            "Should have visible highlights for Finder windows extending outside Chrome")
+    }
 }

@@ -52,7 +52,6 @@ final class HighlightWindowTests: XCTestCase {
         var callbackFired = false
         highlightWindow.onClick = { callbackFired = true }
 
-        // Invoke the closure directly to verify the property assignment works
         highlightWindow.onClick?()
         XCTAssertTrue(callbackFired)
     }
@@ -113,7 +112,6 @@ final class HighlightWindowTests: XCTestCase {
             return
         }
 
-        // CG coords: top-left origin at (100, 200), size 400x300
         let cgBounds = CGRect(x: 100, y: 200, width: 400, height: 300)
         let finderWindow = FinderWindow(
             windowID: 9,
@@ -123,7 +121,6 @@ final class HighlightWindowTests: XCTestCase {
         )
         let highlightWindow = HighlightWindow(finderWindow: finderWindow)
 
-        // Expected Cocoa Y: screenHeight - cgY - cgHeight
         let expectedCocoaY = screenFrame.height - cgBounds.origin.y - cgBounds.height
 
         let windowFrame = highlightWindow.frame
@@ -131,5 +128,33 @@ final class HighlightWindowTests: XCTestCase {
         XCTAssertEqual(windowFrame.origin.y, expectedCocoaY, accuracy: 0.5)
         XCTAssertEqual(windowFrame.width, 400, accuracy: 0.5)
         XCTAssertEqual(windowFrame.height, 300, accuracy: 0.5)
+    }
+
+    // MARK: - Color Assignment
+
+    func testDifferentColorIndicesProduceDifferentColors() {
+        let fw = FinderWindow(windowID: 1, title: "A", bounds: CGRect(x: 0, y: 0, width: 800, height: 600), path: "/tmp/a")
+        let hw0 = HighlightWindow(finderWindow: fw, colorIndex: 0)
+        let hw1 = HighlightWindow(finderWindow: fw, colorIndex: 1)
+
+        // Different color indices should produce different background colors
+        XCTAssertNotEqual(hw0.backgroundColor, hw1.backgroundColor)
+    }
+
+    func testColorIndexWrapsAround() {
+        // There are 8 colors in the palette, index 8 should wrap to index 0
+        let color0 = HighlightColor.forIndex(0)
+        let color8 = HighlightColor.forIndex(8)
+        XCTAssertEqual(color0.nsColor, color8.nsColor)
+    }
+
+    func testAllHighlightColorsDistinct() {
+        let all = HighlightColor.allCases
+        var seen = Set<String>()
+        for c in all {
+            let desc = c.nsColor.description
+            XCTAssertFalse(seen.contains(desc), "Duplicate color: \(c)")
+            seen.insert(desc)
+        }
     }
 }

@@ -1,5 +1,29 @@
 import AppKit
 
+/// Color palette for distinguishing multiple Finder window highlights.
+/// Muted but distinct — chosen to work well as semi-transparent overlays.
+enum HighlightColor: CaseIterable {
+    case blue, purple, teal, orange, pink, green, indigo, coral
+
+    var nsColor: NSColor {
+        switch self {
+        case .blue:    return .systemBlue
+        case .purple:  return .systemPurple
+        case .teal:    return .systemTeal
+        case .orange:  return .systemOrange
+        case .pink:    return .systemPink
+        case .green:   return .systemGreen
+        case .indigo:  return .systemIndigo
+        case .coral:   return NSColor(red: 1.0, green: 0.42, blue: 0.38, alpha: 1.0)
+        }
+    }
+
+    static func forIndex(_ index: Int) -> HighlightColor {
+        let all = Self.allCases
+        return all[index % all.count]
+    }
+}
+
 /// A borderless overlay panel placed over a Finder window to highlight it.
 /// Uses NSPanel with worksWhenModal so it's clickable during modal dialogs.
 final class HighlightWindow: NSPanel {
@@ -7,8 +31,10 @@ final class HighlightWindow: NSPanel {
     var finderPath: String { finderWindowInfo.path }
     private let finderWindowInfo: FinderWindow
 
-    init(finderWindow: FinderWindow) {
+    init(finderWindow: FinderWindow, colorIndex: Int = 0) {
         self.finderWindowInfo = finderWindow
+
+        let color = HighlightColor.forIndex(colorIndex)
 
         // Convert from CGWindowList coords (top-left origin) to Cocoa coords (bottom-left origin)
         let screenFrame = NSScreen.main?.frame ?? .zero
@@ -32,16 +58,30 @@ final class HighlightWindow: NSPanel {
         worksWhenModal = true
         level = .modalPanel
         isOpaque = false
-        backgroundColor = NSColor.systemBlue.withAlphaComponent(0.08)
+        backgroundColor = color.nsColor.withAlphaComponent(0.08)
         ignoresMouseEvents = false
         hasShadow = false
         hidesOnDeactivate = false
         collectionBehavior = [.canJoinAllSpaces, .stationary]
 
+        // Show last 2 path components for context (e.g. "Projects/MyApp")
+        let displayName = Self.shortPath(finderWindow.path)
+
         let view = HighlightView(frame: NSRect(origin: .zero, size: frame.size),
-                                 folderName: finderWindow.name)
+                                 folderName: displayName,
+                                 color: color)
         view.onClick = { [weak self] in self?.onClick?() }
         contentView = view
+    }
+
+    /// Returns the last 2 path components, or just the name for shallow paths.
+    private static func shortPath(_ path: String) -> String {
+        let components = URL(fileURLWithPath: path).pathComponents
+        // pathComponents includes "/" as first element
+        if components.count >= 3 {
+            return components.suffix(2).joined(separator: "/")
+        }
+        return URL(fileURLWithPath: path).lastPathComponent
     }
 }
 
@@ -49,10 +89,11 @@ private class HighlightView: NSView {
     var onClick: (() -> Void)?
     private var isHovering = false
     private let pillView: NSView
-    private let pillLabel: NSTextField
-    private let pillIcon: NSImageView
+    private let highlightColor: HighlightColor
 
-    init(frame: NSRect, folderName: String) {
+    init(frame: NSRect, folderName: String, color: HighlightColor) {
+        self.highlightColor = color
+
         // Build the pill label
         let icon = NSImageView()
         icon.image = NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil)
@@ -61,44 +102,42 @@ private class HighlightView: NSView {
         icon.translatesAutoresizingMaskIntoConstraints = false
 
         let label = NSTextField(labelWithString: folderName)
-        label.font = .systemFont(ofSize: 11, weight: .medium)
+        label.font = .systemFont(ofSize: 12, weight: .semibold)
         label.textColor = .white
         label.backgroundColor = .clear
-        label.lineBreakMode = .byTruncatingMiddle
+        label.lineBreakMode = .byTruncatingHead
         label.translatesAutoresizingMaskIntoConstraints = false
 
         let pill = NSView()
         pill.wantsLayer = true
-        pill.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.55).cgColor
-        pill.layer?.cornerRadius = 10
+        pill.layer?.backgroundColor = color.nsColor.withAlphaComponent(0.75).cgColor
+        pill.layer?.cornerRadius = 12
         pill.translatesAutoresizingMaskIntoConstraints = false
         pill.addSubview(icon)
         pill.addSubview(label)
 
         self.pillView = pill
-        self.pillLabel = label
-        self.pillIcon = icon
 
         super.init(frame: frame)
         addSubview(pill)
 
         NSLayoutConstraint.activate([
             // Icon
-            icon.leadingAnchor.constraint(equalTo: pill.leadingAnchor, constant: 8),
+            icon.leadingAnchor.constraint(equalTo: pill.leadingAnchor, constant: 10),
             icon.centerYAnchor.constraint(equalTo: pill.centerYAnchor),
-            icon.widthAnchor.constraint(equalToConstant: 12),
-            icon.heightAnchor.constraint(equalToConstant: 12),
+            icon.widthAnchor.constraint(equalToConstant: 14),
+            icon.heightAnchor.constraint(equalToConstant: 14),
 
             // Label
-            label.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 4),
-            label.trailingAnchor.constraint(equalTo: pill.trailingAnchor, constant: -10),
+            label.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 5),
+            label.trailingAnchor.constraint(equalTo: pill.trailingAnchor, constant: -12),
             label.centerYAnchor.constraint(equalTo: pill.centerYAnchor),
 
             // Pill sizing and position — bottom center
             pill.centerXAnchor.constraint(equalTo: self.centerXAnchor),
-            pill.bottomAnchor.constraint(equalTo: self.bottomAnchor, constant: -8),
-            pill.heightAnchor.constraint(equalToConstant: 22),
-            pill.widthAnchor.constraint(lessThanOrEqualTo: self.widthAnchor, constant: -24),
+            pill.bottomAnchor.constraint(equalTo: self.bottomAnchor, constant: -10),
+            pill.heightAnchor.constraint(equalToConstant: 26),
+            pill.widthAnchor.constraint(lessThanOrEqualTo: self.widthAnchor, constant: -20),
         ])
     }
 
@@ -119,15 +158,15 @@ private class HighlightView: NSView {
 
     override func mouseEntered(with event: NSEvent) {
         isHovering = true
-        window?.backgroundColor = NSColor.systemBlue.withAlphaComponent(0.15)
-        pillView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.72).cgColor
+        window?.backgroundColor = highlightColor.nsColor.withAlphaComponent(0.18)
+        pillView.layer?.backgroundColor = highlightColor.nsColor.withAlphaComponent(0.9).cgColor
         needsDisplay = true
     }
 
     override func mouseExited(with event: NSEvent) {
         isHovering = false
-        window?.backgroundColor = NSColor.systemBlue.withAlphaComponent(0.08)
-        pillView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.55).cgColor
+        window?.backgroundColor = highlightColor.nsColor.withAlphaComponent(0.08)
+        pillView.layer?.backgroundColor = highlightColor.nsColor.withAlphaComponent(0.75).cgColor
         needsDisplay = true
     }
 
@@ -136,7 +175,7 @@ private class HighlightView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        let borderColor = NSColor.systemBlue.withAlphaComponent(isHovering ? 0.6 : 0.3)
+        let borderColor = highlightColor.nsColor.withAlphaComponent(isHovering ? 0.6 : 0.3)
         borderColor.setStroke()
         let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), xRadius: 6, yRadius: 6)
         path.lineWidth = 2

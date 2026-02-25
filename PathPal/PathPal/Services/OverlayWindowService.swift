@@ -124,15 +124,15 @@ final class OverlayWindowService {
             excludeRects.append(CGRect(x: pf.origin.x, y: cgY, width: pf.width, height: pf.height))
         }
 
-        for fw in appState.finderWindows {
+        for (colorIndex, fw) in appState.finderWindows.enumerated() {
             // Compute visible portion of this Finder window (exclude dialog/overlay overlap)
             let visibleBounds = subtractRects(from: fw.bounds, excluding: excludeRects)
             if visibleBounds.isEmpty { continue }
 
-            // Create highlight windows for each visible region
+            // Create highlight windows for each visible region (same color for same Finder window)
             for region in visibleBounds {
                 let clippedFW = FinderWindow(windowID: fw.windowID, title: fw.title, bounds: region, path: fw.path)
-                let hw = HighlightWindow(finderWindow: clippedFW)
+                let hw = HighlightWindow(finderWindow: clippedFW, colorIndex: colorIndex)
                 hw.onClick = { [weak self] in
                     debugLog("Highlight click: \(fw.title) path=\(fw.path)")
                     self?.navigateDialog(toPath: fw.path)

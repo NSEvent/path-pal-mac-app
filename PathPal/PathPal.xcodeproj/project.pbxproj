@@ -48,6 +48,12 @@
 		A10042000000000000000042 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A20042000000000000000042 /* AppKit.framework */; };
 		A10043000000000000000043 /* FinderSync.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A20043000000000000000043 /* FinderSync.framework */; };
 		45C13966331448C781805698 /* FinderFavoritesService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAE284952E77467991263479 /* FinderFavoritesService.swift */; };
+		AA54D8D9F7214E86A20113B7 /* OverlayWindowServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E454543DF204463B780A523 /* OverlayWindowServiceTests.swift */; };
+		0857AB45C6DA45CE9AC25D13 /* FinderWindowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BDABB6E25C44F2CA9D006E6 /* FinderWindowTests.swift */; };
+		FE9C4F0B7A3648FA950DBE7E /* DialogInfoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 550825C0E88A4B44893B6D22 /* DialogInfoTests.swift */; };
+		ED8971AF0CB6453298607973 /* AppStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55AA32B1BEB94369B00C514C /* AppStateTests.swift */; };
+		343119790C304653891F8505 /* HighlightWindowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A87A2E885BC46F99AB85393 /* HighlightWindowTests.swift */; };
+		083DAE2AEFC746E9B4C9435B /* FinderFavoritesServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30DBD1CDBB7941B4929358D4 /* FinderFavoritesServiceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -129,6 +135,12 @@
 		A30002000000000000000002 /* PathPalTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PathPalTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A30003000000000000000003 /* PathPalFinderExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PathPalFinderExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		BAE284952E77467991263479 /* FinderFavoritesService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderFavoritesService.swift; sourceTree = "<group>"; };
+		4E454543DF204463B780A523 /* OverlayWindowServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayWindowServiceTests.swift; sourceTree = "<group>"; };
+		9BDABB6E25C44F2CA9D006E6 /* FinderWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderWindowTests.swift; sourceTree = "<group>"; };
+		550825C0E88A4B44893B6D22 /* DialogInfoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DialogInfoTests.swift; sourceTree = "<group>"; };
+		55AA32B1BEB94369B00C514C /* AppStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStateTests.swift; sourceTree = "<group>"; };
+		2A87A2E885BC46F99AB85393 /* HighlightWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HighlightWindowTests.swift; sourceTree = "<group>"; };
+		30DBD1CDBB7941B4929358D4 /* FinderFavoritesServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderFavoritesServiceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -257,7 +269,12 @@
 				A20023000000000000000023 /* SettingsServiceTests.swift */,
 				A20024000000000000000024 /* PathAutocompletionTests.swift */,
 				A20025000000000000000025 /* DialogDetectionTests.swift */,
-			);
+				4E454543DF204463B780A523 /* OverlayWindowServiceTests.swift */,
+				9BDABB6E25C44F2CA9D006E6 /* FinderWindowTests.swift */,
+				550825C0E88A4B44893B6D22 /* DialogInfoTests.swift */,
+				55AA32B1BEB94369B00C514C /* AppStateTests.swift */,
+				2A87A2E885BC46F99AB85393 /* HighlightWindowTests.swift */,
+				30DBD1CDBB7941B4929358D4 /* FinderFavoritesServiceTests.swift */,);
 			path = PathPalTests;
 			sourceTree = "<group>";
 		};
@@ -462,6 +479,12 @@
 				A10023000000000000000023 /* SettingsServiceTests.swift in Sources */,
 				A10024000000000000000024 /* PathAutocompletionTests.swift in Sources */,
 				A10025000000000000000025 /* DialogDetectionTests.swift in Sources */,
+				AA54D8D9F7214E86A20113B7 /* OverlayWindowServiceTests.swift in Sources */,
+				0857AB45C6DA45CE9AC25D13 /* FinderWindowTests.swift in Sources */,
+				FE9C4F0B7A3648FA950DBE7E /* DialogInfoTests.swift in Sources */,
+				ED8971AF0CB6453298607973 /* AppStateTests.swift in Sources */,
+				343119790C304653891F8505 /* HighlightWindowTests.swift in Sources */,
+				083DAE2AEFC746E9B4C9435B /* FinderFavoritesServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

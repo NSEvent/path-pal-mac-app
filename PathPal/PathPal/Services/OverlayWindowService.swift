@@ -146,7 +146,7 @@ final class OverlayWindowService {
 
     /// Subtract excluding rects from a source rect, returning visible regions.
     /// Uses a simple approach: split horizontally/vertically around each exclusion.
-    private func subtractRects(from source: CGRect, excluding: [CGRect]) -> [CGRect] {
+    func subtractRects(from source: CGRect, excluding: [CGRect]) -> [CGRect] {
         var remaining = [source]
         for excl in excluding {
             var next: [CGRect] = []
@@ -264,7 +264,7 @@ final class OverlayWindowService {
         }
 
         // Don't intercept clicks on highlight windows — they handle clicks themselves
-        for hw in highlightWindows {
+        for hw in highlightWindows.reversed() {
             let hf = hw.frame
             let cgHwY = screen.frame.height - hf.origin.y - hf.height
             let cgHwRect = CGRect(x: hf.origin.x, y: cgHwY, width: hf.width, height: hf.height)
@@ -317,9 +317,9 @@ final class OverlayWindowService {
             return
         }
 
-        // Match against highlight windows (what the user actually sees and clicks)
-        // so the tooltip path always matches the click navigation path
-        for hw in highlightWindows {
+        // Match against highlight windows in reverse order (last created = on top visually)
+        // so the tooltip matches the top-most window, which is what receives the click
+        for hw in highlightWindows.reversed() {
             let hf = hw.frame
             let cgHwY = screen.frame.height - hf.origin.y - hf.height
             let cgHwRect = CGRect(x: hf.origin.x, y: cgHwY, width: hf.width, height: hf.height)

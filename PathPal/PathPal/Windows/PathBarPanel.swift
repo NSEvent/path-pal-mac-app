@@ -2,6 +2,8 @@ import AppKit
 
 /// A floating panel for the path bar.
 final class PathBarPanel: NSPanel {
+    var onLostFocus: (() -> Void)?
+
     init() {
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: 500, height: 400),
@@ -21,6 +23,11 @@ final class PathBarPanel: NSPanel {
     }
 
     override var canBecomeKey: Bool { true }
+
+    override func resignKey() {
+        super.resignKey()
+        onLostFocus?()
+    }
 
     /// Position the panel centered near the top of the screen.
     func positionAboveFinderWindow() {

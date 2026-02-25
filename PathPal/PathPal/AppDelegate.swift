@@ -128,6 +128,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
         )
         panel.contentView = NSHostingView(rootView: pathBarView)
+        panel.onLostFocus = { [weak self] in
+            self?.pathBarPanel?.close()
+            self?.pathBarPanel = nil
+        }
         panel.positionAboveFinderWindow()
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)

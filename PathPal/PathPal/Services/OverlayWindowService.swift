@@ -23,11 +23,11 @@ final class OverlayWindowService {
             finderWindows: finderWindows,
             dialogType: dialog.type,
             onFolderSelected: { [weak self] path in
-                self?.navigateAndDismiss(dialog: dialog, path: path)
+                self?.navigateDialog(dialog, toPath: path)
             },
             onDesktopSelected: { [weak self] in
                 let desktop = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Desktop").path
-                self?.navigateAndDismiss(dialog: dialog, path: desktop)
+                self?.navigateDialog(dialog, toPath: desktop)
             },
             onDismiss: { [weak self] in
                 self?.hideOverlay()
@@ -53,9 +53,8 @@ final class OverlayWindowService {
         hideHighlights()
     }
 
-    private func navigateAndDismiss(dialog: DialogInfo, path: String) {
+    private func navigateDialog(_ dialog: DialogInfo, toPath path: String) {
         dialogNavigationService.navigateDialog(pid: dialog.pid, toPath: path)
-        hideOverlay()
     }
 
     private func positionOverlay(_ panel: OverlayPanel, relativeTo dialog: DialogInfo) {
@@ -101,7 +100,7 @@ final class OverlayWindowService {
             let highlight = HighlightWindow(finderWindow: window)
             highlight.onClick = { [weak self] in
                 guard SettingsService.shared.clickFinderWindowToChoose else { return }
-                self?.navigateAndDismiss(dialog: dialog, path: window.path)
+                self?.navigateDialog(dialog, toPath: window.path)
             }
             highlight.orderFront(nil)
             highlightWindows[window.windowID] = highlight

@@ -74,6 +74,20 @@ final class HighlightWindow: NSPanel {
         contentView = view
     }
 
+    /// The pill label's frame in CG screen coordinates (top-left origin),
+    /// used by OverlayWindowService for cross-window pill hit-testing.
+    var pillFrameInScreenCG: CGRect {
+        guard let view = contentView as? HighlightView,
+              let screen = NSScreen.main else { return .zero }
+        let windowFrame = view.pillFrameInWindow
+        let screenFrame = convertToScreen(windowFrame)
+        // Convert Cocoa (bottom-left) to CG (top-left)
+        return CGRect(x: screenFrame.origin.x,
+                      y: screen.frame.height - screenFrame.origin.y - screenFrame.height,
+                      width: screenFrame.width,
+                      height: screenFrame.height)
+    }
+
     /// Returns the last 2 path components, or just the name for shallow paths.
     private static func shortPath(_ path: String) -> String {
         let components = URL(fileURLWithPath: path).pathComponents
@@ -85,11 +99,16 @@ final class HighlightWindow: NSPanel {
     }
 }
 
-private class HighlightView: NSView {
+class HighlightView: NSView {
     var onClick: (() -> Void)?
     private var isHovering = false
     private let pillView: NSView
     private let highlightColor: HighlightColor
+
+    /// Pill label frame in window coordinates (for converting to screen coords).
+    var pillFrameInWindow: CGRect {
+        pillView.convert(pillView.bounds, to: nil)
+    }
 
     init(frame: NSRect, folderName: String, color: HighlightColor) {
         self.highlightColor = color

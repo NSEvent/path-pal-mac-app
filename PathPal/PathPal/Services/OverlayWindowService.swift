@@ -142,8 +142,24 @@ final class OverlayWindowService {
                 let clippedFW = FinderWindow(windowID: fw.windowID, title: fw.title, bounds: region, path: fw.path)
                 let hw = HighlightWindow(finderWindow: clippedFW, colorIndex: colorIndex)
                 hw.onClick = { [weak self] in
+                    guard let self = self else { return }
+                    let mouseLocation = NSEvent.mouseLocation
+                    guard let screen = NSScreen.main else { return }
+                    let cgY = screen.frame.height - mouseLocation.y
+                    let cgPoint = CGPoint(x: mouseLocation.x, y: cgY)
+
+                    // Check if click is on any pill label (topmost first)
+                    for candidate in self.highlightWindows.reversed() {
+                        if candidate.pillFrameInScreenCG.contains(cgPoint) {
+                            debugLog("Pill click: \(candidate.finderPath)")
+                            self.navigateDialog(toPath: candidate.finderPath)
+                            return
+                        }
+                    }
+
+                    // No pill hit — navigate to clicked highlight's path
                     debugLog("Highlight click: \(fw.title) path=\(fw.path)")
-                    self?.navigateDialog(toPath: fw.path)
+                    self.navigateDialog(toPath: fw.path)
                 }
                 hw.orderFrontRegardless()
                 highlightWindows.append(hw)
@@ -351,7 +367,18 @@ final class OverlayWindowService {
             return
         }
 
-        // Match against highlight windows in reverse order (last created = on top visually)
+        // First pass: check if mouse is directly on any pill label (reverse = topmost first)
+        // Pills from lower windows should take hover priority over transparent overlay above them
+        for hw in highlightWindows.reversed() {
+            if hw.pillFrameInScreenCG.contains(cgPoint) {
+                let path = hw.finderPath
+                let name = URL(fileURLWithPath: path).lastPathComponent
+                showTooltip(for: (name: name, path: path, bounds: hw.pillFrameInScreenCG), at: mouseLocation)
+                return
+            }
+        }
+
+        // Second pass: match against highlight windows in reverse order (last created = on top visually)
         // so the tooltip matches the top-most window, which is what receives the click
         for hw in highlightWindows.reversed() {
             let hf = hw.frame

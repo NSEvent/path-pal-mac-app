@@ -106,6 +106,7 @@ class HighlightView: NSView {
     var onRightClick: (() -> Void)?
     private var isHovering = false
     private let pillView: NSView
+    private let pillTintLayer: CALayer
     private let highlightColor: HighlightColor
 
     /// Pill label frame in window coordinates (for converting to screen coords).
@@ -116,7 +117,7 @@ class HighlightView: NSView {
     init(frame: NSRect, folderName: String, color: HighlightColor) {
         self.highlightColor = color
 
-        // Build the pill label
+        // Build the pill label using vibrancy material with colored tint
         let icon = NSImageView()
         icon.image = NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil)
         icon.contentTintColor = .white
@@ -130,20 +131,42 @@ class HighlightView: NSView {
         label.lineBreakMode = .byTruncatingHead
         label.translatesAutoresizingMaskIntoConstraints = false
 
+        // Vibrancy background with colored tint overlay
+        let effectView = NSVisualEffectView()
+        effectView.material = .hudWindow
+        effectView.state = .active
+        effectView.blendingMode = .behindWindow
+        effectView.wantsLayer = true
+        effectView.translatesAutoresizingMaskIntoConstraints = false
+
+        let tintLayer = CALayer()
+        tintLayer.backgroundColor = color.nsColor.withAlphaComponent(0.55).cgColor
+
         let pill = NSView()
         pill.wantsLayer = true
-        pill.layer?.backgroundColor = color.nsColor.withAlphaComponent(0.75).cgColor
         pill.layer?.cornerRadius = 12
+        pill.layer?.masksToBounds = true
+        // Subtle inner border for definition against complex backgrounds
+        pill.layer?.borderWidth = 1
+        pill.layer?.borderColor = NSColor.white.withAlphaComponent(0.15).cgColor
         pill.translatesAutoresizingMaskIntoConstraints = false
+        pill.addSubview(effectView)
         pill.addSubview(icon)
         pill.addSubview(label)
 
         self.pillView = pill
+        self.pillTintLayer = tintLayer
 
         super.init(frame: frame)
         addSubview(pill)
 
         NSLayoutConstraint.activate([
+            // Effect view fills pill
+            effectView.leadingAnchor.constraint(equalTo: pill.leadingAnchor),
+            effectView.trailingAnchor.constraint(equalTo: pill.trailingAnchor),
+            effectView.topAnchor.constraint(equalTo: pill.topAnchor),
+            effectView.bottomAnchor.constraint(equalTo: pill.bottomAnchor),
+
             // Icon
             icon.leadingAnchor.constraint(equalTo: pill.leadingAnchor, constant: 10),
             icon.centerYAnchor.constraint(equalTo: pill.centerYAnchor),
@@ -165,6 +188,17 @@ class HighlightView: NSView {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    override func layout() {
+        super.layout()
+        // Ensure tint layer is added and sized to fill the effect view
+        if pillTintLayer.superlayer == nil {
+            if let effectView = pillView.subviews.first as? NSVisualEffectView {
+                effectView.layer?.addSublayer(pillTintLayer)
+            }
+        }
+        pillTintLayer.frame = pillView.bounds
+    }
+
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         for area in trackingAreas {
@@ -181,14 +215,16 @@ class HighlightView: NSView {
     override func mouseEntered(with event: NSEvent) {
         isHovering = true
         window?.backgroundColor = highlightColor.nsColor.withAlphaComponent(0.18)
-        pillView.layer?.backgroundColor = highlightColor.nsColor.withAlphaComponent(0.9).cgColor
+        pillTintLayer.backgroundColor = highlightColor.nsColor.withAlphaComponent(0.7).cgColor
+        pillView.layer?.borderColor = NSColor.white.withAlphaComponent(0.25).cgColor
         needsDisplay = true
     }
 
     override func mouseExited(with event: NSEvent) {
         isHovering = false
         window?.backgroundColor = highlightColor.nsColor.withAlphaComponent(0.08)
-        pillView.layer?.backgroundColor = highlightColor.nsColor.withAlphaComponent(0.75).cgColor
+        pillTintLayer.backgroundColor = highlightColor.nsColor.withAlphaComponent(0.55).cgColor
+        pillView.layer?.borderColor = NSColor.white.withAlphaComponent(0.15).cgColor
         needsDisplay = true
     }
 

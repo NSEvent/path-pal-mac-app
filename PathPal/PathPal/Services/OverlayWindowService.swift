@@ -194,7 +194,15 @@ final class OverlayWindowService {
             guard !intersection.isNull && !intersection.isEmpty else { continue }
             let overlapArea = intersection.width * intersection.height
             if overlapArea / dialogArea > 0.5 {
-                result.append(rect.insetBy(dx: -20, dy: -20))
+                let rectArea = rect.width * rect.height
+                if rectArea > dialogArea * 2 {
+                    // Oversized parent window (e.g. fullscreen Chrome) — only
+                    // exclude the dialog-sized region, not the entire window.
+                    result.append(dialogBounds.insetBy(dx: -20, dy: -20))
+                } else {
+                    // Dialog-sized window — exclude at full size.
+                    result.append(rect.insetBy(dx: -20, dy: -20))
+                }
             }
         }
         return result
@@ -458,15 +466,24 @@ final class OverlayWindowService {
         panel.worksWhenModal = true
         panel.level = .screenSaver
         panel.isOpaque = false
-        panel.backgroundColor = NSColor.black.withAlphaComponent(0.85)
+        panel.backgroundColor = .clear
         panel.hasShadow = true
         panel.hidesOnDeactivate = false
         panel.ignoresMouseEvents = true
 
-        let container = NSView(frame: NSRect(origin: .zero, size: size))
+        // Use vibrancy material with dark appearance for a native tooltip feel
+        let effectView = NSVisualEffectView(frame: NSRect(origin: .zero, size: size))
+        effectView.material = .hudWindow
+        effectView.state = .active
+        effectView.blendingMode = .behindWindow
+        effectView.appearance = NSAppearance(named: .darkAqua)
+        effectView.wantsLayer = true
+        effectView.layer?.cornerRadius = 5
+        effectView.layer?.masksToBounds = true
+
         label.frame = NSRect(x: 8, y: 2, width: label.frame.width, height: 20)
-        container.addSubview(label)
-        panel.contentView = container
+        effectView.addSubview(label)
+        panel.contentView = effectView
         panel.orderFront(nil)
         tooltipPanel = panel
     }

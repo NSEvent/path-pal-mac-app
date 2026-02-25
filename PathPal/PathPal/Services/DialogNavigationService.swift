@@ -5,6 +5,8 @@ import Carbon
 final class DialogNavigationService {
 
     /// Navigate an Open/Save dialog to the specified path.
+    /// Uses Cmd+Shift+G to open "Go to Folder", then sets the path via Accessibility API
+    /// (no clipboard manipulation, no fixed delays).
     func navigateDialog(pid: pid_t, toPath path: String) {
         NSLog("[PathPal] Navigating dialog (pid %d) to: %@", pid, path)
 
@@ -16,40 +18,83 @@ final class DialogNavigationService {
         app.activate()
         NSLog("[PathPal] Activated app: %@", app.localizedName ?? "unknown")
 
-        // Wait for app to become active, then send Cmd+Shift+G via HID tap
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+        // Snapshot the currently focused element before triggering Go to Folder
+        let systemWide = AXUIElementCreateSystemWide()
+        var preFocused: CFTypeRef?
+        AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &preFocused)
+
+        // Wait for app to become active, then send Cmd+Shift+G
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self = self else { return }
             NSLog("[PathPal] Sending Cmd+Shift+G via HID")
             Self.postKey(code: 5, flags: [.maskCommand, .maskShift]) // G
 
-            // Wait for "Go to Folder" sheet
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                NSLog("[PathPal] Pasting path via clipboard")
+            // Poll for the Go to Folder text field to appear
+            self.pollForGoToFolderField(
+                pid: pid,
+                path: path,
+                preFocused: preFocused as! AXUIElement?,
+                attempt: 0
+            )
+        }
+    }
 
-                // Save current clipboard, set path, paste, restore
-                let pasteboard = NSPasteboard.general
-                let oldContents = pasteboard.string(forType: .string)
-                pasteboard.clearContents()
-                pasteboard.setString(path, forType: .string)
+    /// Poll the AX tree to find the Go to Folder text field, then set its value.
+    private func pollForGoToFolderField(pid: pid_t, path: String, preFocused: AXUIElement?, attempt: Int) {
+        // Give up after ~3 seconds (30 attempts * 100ms)
+        guard attempt < 30 else {
+            NSLog("[PathPal] Timed out waiting for Go to Folder field")
+            return
+        }
 
-                // Select all then paste
-                Self.postKey(code: 0, flags: [.maskCommand]) // Cmd+A
-                usleep(50_000)
-                Self.postKey(code: 9, flags: [.maskCommand]) // Cmd+V
+        // Check the currently focused element — after Cmd+Shift+G, focus moves to the Go to Folder text field
+        let systemWide = AXUIElementCreateSystemWide()
+        var focusedRef: CFTypeRef?
+        AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef)
 
-                // Press Return to confirm, then restore clipboard
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    NSLog("[PathPal] Pressing Return")
-                    Self.postKey(code: 36, flags: [])
+        if let focused = focusedRef {
+            let focusedElement = focused as! AXUIElement
 
-                    // Restore clipboard after a delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        if let old = oldContents {
-                            pasteboard.clearContents()
-                            pasteboard.setString(old, forType: .string)
-                        }
+            // Check if the focused element is a text field or combo box (the Go to Folder input)
+            var role: CFTypeRef?
+            AXUIElementCopyAttributeValue(focusedElement, kAXRoleAttribute as CFString, &role)
+            let roleStr = role as? String ?? ""
+
+            let isTextField = roleStr == kAXTextFieldRole || roleStr == kAXComboBoxRole || roleStr == kAXTextAreaRole
+
+            // Make sure it's a different element than what was focused before Cmd+Shift+G
+            let isDifferent = preFocused == nil || !CFEqual(focusedElement, preFocused!)
+
+            if isTextField && isDifferent {
+                NSLog("[PathPal] Found Go to Folder field (role: %@), setting path via AX", roleStr)
+
+                // Set the path value directly via Accessibility API
+                let result = AXUIElementSetAttributeValue(focusedElement, kAXValueAttribute as CFString, path as CFTypeRef)
+                NSLog("[PathPal] AXSetValue result: %d", result.rawValue)
+
+                if result == .success {
+                    // Press Return to confirm navigation
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        NSLog("[PathPal] Pressing Return to confirm")
+                        Self.postKey(code: 36, flags: []) // Return
+                    }
+                } else {
+                    // Fallback: type the path character by character via CGEvent
+                    NSLog("[PathPal] AXSetValue failed, falling back to keystroke typing")
+                    Self.postKey(code: 0, flags: [.maskCommand]) // Cmd+A to select all first
+                    usleep(50_000)
+                    Self.typeString(path)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        Self.postKey(code: 36, flags: []) // Return
                     }
                 }
+                return
             }
+        }
+
+        // Not found yet — try again in 100ms
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.pollForGoToFolderField(pid: pid, path: path, preFocused: preFocused, attempt: attempt + 1)
         }
     }
 

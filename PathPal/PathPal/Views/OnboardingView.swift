@@ -3,6 +3,7 @@ import SwiftUI
 struct OnboardingView: View {
     @State private var isAccessibilityGranted = PermissionsService.shared.isAccessibilityGranted
     @State private var isAutomationGranted = false
+    @State private var isFullDiskAccessGranted = PermissionsService.shared.isFullDiskAccessGranted
     let onComplete: () -> Void
 
     var body: some View {
@@ -51,6 +52,21 @@ struct OnboardingView: View {
                                     isAutomationGranted = true
                                     timer.invalidate()
                                 }
+                            }
+                        }
+                    }
+                )
+
+                permissionRow(
+                    title: "Full Disk Access",
+                    description: "Optional — enables reading Finder sidebar favorites",
+                    isGranted: isFullDiskAccessGranted,
+                    action: {
+                        PermissionsService.shared.openFullDiskAccessPreferences()
+                        Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { timer in
+                            if PermissionsService.shared.isFullDiskAccessGranted {
+                                isFullDiskAccessGranted = true
+                                timer.invalidate()
                             }
                         }
                     }

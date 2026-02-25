@@ -32,6 +32,60 @@ final class MenuBarService: NSObject, NSMenuDelegate {
         let menu = NSMenu()
         menu.delegate = self
 
+        let home = FileManager.default.homeDirectoryForCurrentUser
+
+        // Quick Access submenu
+        let quickAccessItem = NSMenuItem(title: "Quick Access", action: nil, keyEquivalent: "")
+        let quickAccessSubmenu = NSMenu()
+        let quickAccessFolders: [(name: String, path: String, icon: String)] = [
+            ("Desktop", home.appendingPathComponent("Desktop").path, "desktopcomputer"),
+            ("Documents", home.appendingPathComponent("Documents").path, "doc.fill"),
+            ("Downloads", home.appendingPathComponent("Downloads").path, "arrow.down.circle.fill"),
+            ("Pictures", home.appendingPathComponent("Pictures").path, "photo.fill"),
+            ("Music", home.appendingPathComponent("Music").path, "music.note"),
+            ("Movies", home.appendingPathComponent("Movies").path, "film"),
+            ("Home", home.path, "house.fill"),
+        ]
+        for qa in quickAccessFolders {
+            let item = NSMenuItem(title: qa.name, action: #selector(openFolder(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = qa.path
+            item.image = NSImage(systemSymbolName: qa.icon, accessibilityDescription: qa.name)?
+                .withSymbolConfiguration(.init(pointSize: 13, weight: .regular))
+            item.toolTip = qa.path
+            // Add lazy-loaded children submenu
+            let childMenu = NSMenu()
+            childMenu.delegate = self
+            childMenu.addItem(NSMenuItem(title: "Loading...", action: nil, keyEquivalent: ""))
+            item.submenu = childMenu
+            item.tag = 1
+            quickAccessSubmenu.addItem(item)
+        }
+        quickAccessItem.submenu = quickAccessSubmenu
+        menu.addItem(quickAccessItem)
+
+        // Finder Favorites submenu
+        let favorites = FinderFavoritesService.shared.getFavorites()
+        if !favorites.isEmpty {
+            let favoritesItem = NSMenuItem(title: "Favorites", action: nil, keyEquivalent: "")
+            let favoritesSubmenu = NSMenu()
+            for fav in favorites {
+                let item = NSMenuItem(title: fav.name, action: #selector(openFolder(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = fav.path
+                item.image = NSWorkspace.shared.icon(forFile: fav.path).resized(to: NSSize(width: 16, height: 16))
+                item.toolTip = fav.path
+                let childMenu = NSMenu()
+                childMenu.delegate = self
+                childMenu.addItem(NSMenuItem(title: "Loading...", action: nil, keyEquivalent: ""))
+                item.submenu = childMenu
+                item.tag = 1
+                favoritesSubmenu.addItem(item)
+            }
+            favoritesItem.submenu = favoritesSubmenu
+            menu.addItem(favoritesItem)
+        }
+
         // Recent Folders submenu
         let foldersItem = NSMenuItem(title: "Recent Folders", action: nil, keyEquivalent: "")
         let foldersSubmenu = NSMenu()
@@ -48,13 +102,11 @@ final class MenuBarService: NSObject, NSMenuDelegate {
                 item.image = folderIcon(for: folder)
                 item.toolTip = folder.path
 
-                // Add submenu for children (lazy-loaded)
                 let childMenu = NSMenu()
                 childMenu.delegate = self
-                // Placeholder to make it show as submenu
                 childMenu.addItem(NSMenuItem(title: "Loading...", action: nil, keyEquivalent: ""))
                 item.submenu = childMenu
-                item.tag = 1  // Mark as folder with lazy children
+                item.tag = 1
 
                 foldersSubmenu.addItem(item)
             }

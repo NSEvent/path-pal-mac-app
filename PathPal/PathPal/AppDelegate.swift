@@ -35,6 +35,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if !SettingsService.shared.hasCompletedOnboarding {
             showOnboarding()
         }
+
+        // Prompt for Full Disk Access if not yet granted (needed for Finder favorites)
+        if !PermissionsService.shared.isFullDiskAccessGranted {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                PermissionsService.shared.requestFullDiskAccess()
+            }
+        }
     }
 
     private static func debugLog(_ message: String) {

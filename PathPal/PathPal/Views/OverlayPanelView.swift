@@ -8,6 +8,9 @@ struct OverlayPanelView: View {
     let onDismiss: () -> Void
 
     @State private var recentFolders: [RecentFolder] = []
+    @State private var finderFavorites: [(name: String, path: String)] = []
+
+    private let home = FileManager.default.homeDirectoryForCurrentUser
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -46,15 +49,32 @@ struct OverlayPanelView: View {
                         onDesktopSelected()
                     }
                     folderRow(name: "Documents", path: "~/Documents", icon: "doc.fill") {
-                        let path = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents").path
-                        onFolderSelected(path)
+                        onFolderSelected(home.appendingPathComponent("Documents").path)
                     }
                     folderRow(name: "Downloads", path: "~/Downloads", icon: "arrow.down.circle.fill") {
-                        let path = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads").path
-                        onFolderSelected(path)
+                        onFolderSelected(home.appendingPathComponent("Downloads").path)
+                    }
+                    folderRow(name: "Pictures", path: "~/Pictures", icon: "photo.fill") {
+                        onFolderSelected(home.appendingPathComponent("Pictures").path)
+                    }
+                    folderRow(name: "Music", path: "~/Music", icon: "music.note") {
+                        onFolderSelected(home.appendingPathComponent("Music").path)
+                    }
+                    folderRow(name: "Movies", path: "~/Movies", icon: "film") {
+                        onFolderSelected(home.appendingPathComponent("Movies").path)
                     }
                     folderRow(name: "Home", path: "~", icon: "house.fill") {
-                        onFolderSelected(FileManager.default.homeDirectoryForCurrentUser.path)
+                        onFolderSelected(home.path)
+                    }
+
+                    // Finder Favorites
+                    if !finderFavorites.isEmpty {
+                        sectionHeader("Favorites")
+                        ForEach(Array(finderFavorites.enumerated()), id: \.offset) { _, fav in
+                            folderRow(name: fav.name, path: fav.path, icon: "star.fill") {
+                                onFolderSelected(fav.path)
+                            }
+                        }
                     }
 
                     // Recent Folders
@@ -75,8 +95,8 @@ struct OverlayPanelView: View {
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .onAppear {
-            let service = RecentItemsService()
-            recentFolders = service.recentFolders
+            recentFolders = RecentItemsService().recentFolders
+            finderFavorites = FinderFavoritesService.shared.getFavorites()
         }
     }
 

@@ -1,7 +1,8 @@
 import AppKit
 
-/// A borderless overlay window placed over a Finder window to highlight it.
-final class HighlightWindow: NSWindow {
+/// A borderless overlay panel placed over a Finder window to highlight it.
+/// Uses NSPanel with worksWhenModal so it's clickable during modal dialogs.
+final class HighlightWindow: NSPanel {
     var onClick: (() -> Void)?
     private let finderWindowInfo: FinderWindow
 
@@ -21,16 +22,19 @@ final class HighlightWindow: NSWindow {
 
         super.init(
             contentRect: frame,
-            styleMask: .borderless,
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
 
+        isFloatingPanel = true
+        worksWhenModal = true
+        level = .modalPanel
         isOpaque = false
         backgroundColor = NSColor.systemBlue.withAlphaComponent(0.08)
-        level = .floating
         ignoresMouseEvents = false
         hasShadow = false
+        hidesOnDeactivate = false
         collectionBehavior = [.canJoinAllSpaces, .stationary]
 
         let view = HighlightView(frame: frame)
@@ -60,11 +64,13 @@ private class HighlightView: NSView {
     override func mouseEntered(with event: NSEvent) {
         isHovering = true
         window?.backgroundColor = NSColor.systemBlue.withAlphaComponent(0.15)
+        needsDisplay = true
     }
 
     override func mouseExited(with event: NSEvent) {
         isHovering = false
         window?.backgroundColor = NSColor.systemBlue.withAlphaComponent(0.08)
+        needsDisplay = true
     }
 
     override func mouseDown(with event: NSEvent) {

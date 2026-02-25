@@ -37,9 +37,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
 
+    private static func debugLog(_ message: String) {
+        let dir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/PathPal")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("debug.log")
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let line = "[\(timestamp)] \(message)\n"
+        if let handle = try? FileHandle(forWritingTo: url) {
+            handle.seekToEndOfFile()
+            handle.write(line.data(using: .utf8)!)
+            handle.closeFile()
+        } else {
+            try? line.write(to: url, atomically: true, encoding: .utf8)
+        }
+    }
+
     private func startServices() {
         // Start Accessibility observer
-        if PermissionsService.shared.isAccessibilityGranted {
+        let axGranted = PermissionsService.shared.isAccessibilityGranted
+        AppDelegate.debugLog("startServices: Accessibility granted = \(axGranted)")
+        if axGranted {
             accessibilityService.start(
                 onDialogDetected: { [weak self] dialog in
                     self?.appState.currentDialog = dialog

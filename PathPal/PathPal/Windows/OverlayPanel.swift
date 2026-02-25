@@ -12,12 +12,13 @@ final class OverlayPanel: NSPanel {
         )
         isFloatingPanel = true
         worksWhenModal = true
-        level = .modalPanel + 1
+        level = .screenSaver
         isOpaque = false
         backgroundColor = .clear
         hasShadow = true
         isMovableByWindowBackground = false
         hidesOnDeactivate = false
         collectionBehavior = [.canJoinAllSpaces, .stationary]
+        isReleasedWhenClosed = false
     }
 }

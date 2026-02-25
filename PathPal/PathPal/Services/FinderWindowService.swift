@@ -59,7 +59,8 @@ final class FinderWindowService {
     }
 
     private func getCGFinderWindows() -> [CGWindowEntry] {
-        guard let windowList = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else {
+        // Use .optionAll to get Finder windows even if behind other windows
+        guard let windowList = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else {
             return []
         }
         return Self.parseCGWindowList(windowList)

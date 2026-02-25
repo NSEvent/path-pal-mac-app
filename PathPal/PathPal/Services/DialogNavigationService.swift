@@ -1,68 +1,86 @@
 import ApplicationServices
+import AppKit
 import Carbon
 
 final class DialogNavigationService {
 
-    /// Navigate an Open/Save dialog to the specified path using Cmd+Shift+G keystroke simulation.
+    /// Navigate an Open/Save dialog to the specified path.
     func navigateDialog(pid: pid_t, toPath path: String) {
-        // Step 1: Send Cmd+Shift+G to open "Go to Folder" sheet
-        DialogNavigationService.sendCmdShiftG(to: pid)
+        NSLog("[PathPal] Navigating dialog (pid %d) to: %@", pid, path)
 
-        // Step 2: Wait for the sheet to appear, then type the path
+        // Reactivate the target app so the dialog is focused
+        guard let app = NSRunningApplication(processIdentifier: pid) else {
+            NSLog("[PathPal] Could not find app for pid %d", pid)
+            return
+        }
+        app.activate()
+        NSLog("[PathPal] Activated app: %@", app.localizedName ?? "unknown")
+
+        // Wait for app to become active, then send Cmd+Shift+G via HID tap
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-            DialogNavigationService.typePath(path, toPid: pid)
+            NSLog("[PathPal] Sending Cmd+Shift+G via HID")
+            Self.postKey(code: 5, flags: [.maskCommand, .maskShift]) // G
 
-            // Step 3: Press Return to confirm
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                DialogNavigationService.pressReturn(toPid: pid)
+            // Wait for "Go to Folder" sheet
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                NSLog("[PathPal] Pasting path via clipboard")
+
+                // Save current clipboard, set path, paste, restore
+                let pasteboard = NSPasteboard.general
+                let oldContents = pasteboard.string(forType: .string)
+                pasteboard.clearContents()
+                pasteboard.setString(path, forType: .string)
+
+                // Select all then paste
+                Self.postKey(code: 0, flags: [.maskCommand]) // Cmd+A
+                usleep(50_000)
+                Self.postKey(code: 9, flags: [.maskCommand]) // Cmd+V
+
+                // Press Return to confirm, then restore clipboard
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    NSLog("[PathPal] Pressing Return")
+                    Self.postKey(code: 36, flags: [])
+
+                    // Restore clipboard after a delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        if let old = oldContents {
+                            pasteboard.clearContents()
+                            pasteboard.setString(old, forType: .string)
+                        }
+                    }
+                }
             }
         }
     }
 
-    private static func sendCmdShiftG(to pid: pid_t) {
-        // Key code for 'G' is 5
-        let keyDown = CGEvent(keyboardEventSource: nil, virtualKey: 5, keyDown: true)
-        keyDown?.flags = [.maskCommand, .maskShift]
-        keyDown?.postToPid(pid)
-
-        let keyUp = CGEvent(keyboardEventSource: nil, virtualKey: 5, keyDown: false)
-        keyUp?.flags = [.maskCommand, .maskShift]
-        keyUp?.postToPid(pid)
+    /// Post a key event to the currently active application via HID event tap.
+    private static func postKey(code: CGKeyCode, flags: CGEventFlags) {
+        guard let down = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: true),
+              let up = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: false) else {
+            NSLog("[PathPal] Failed to create CGEvent")
+            return
+        }
+        down.flags = flags
+        up.flags = flags
+        down.post(tap: .cghidEventTap)
+        up.post(tap: .cghidEventTap)
     }
 
-    private static func typePath(_ path: String, toPid pid: pid_t) {
-        // First, select all existing text (Cmd+A)
-        let selectAllDown = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: true)
-        selectAllDown?.flags = .maskCommand
-        selectAllDown?.postToPid(pid)
-
-        let selectAllUp = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: false)
-        selectAllUp?.flags = .maskCommand
-        selectAllUp?.postToPid(pid)
-
-        // Type the path using unicode string events
-        let chars = Array(path.utf16)
+    /// Type a string by posting unicode keyboard events to the active application.
+    private static func typeString(_ string: String) {
+        let chars = Array(string.utf16)
         let chunkSize = 20
         for i in stride(from: 0, to: chars.count, by: chunkSize) {
             let end = min(i + chunkSize, chars.count)
-            let chunk = Array(chars[i..<end])
+            var chunk = Array(chars[i..<end])
 
-            let event = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: true)
-            var mutableChunk = chunk
-            event?.keyboardSetUnicodeString(stringLength: chunk.count, unicodeString: &mutableChunk)
-            event?.postToPid(pid)
-
-            let upEvent = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: false)
-            upEvent?.postToPid(pid)
+            guard let down = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: true),
+                  let up = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: false) else {
+                continue
+            }
+            down.keyboardSetUnicodeString(stringLength: chunk.count, unicodeString: &chunk)
+            down.post(tap: .cghidEventTap)
+            up.post(tap: .cghidEventTap)
         }
-    }
-
-    private static func pressReturn(toPid pid: pid_t) {
-        // Return key code is 36
-        let keyDown = CGEvent(keyboardEventSource: nil, virtualKey: 36, keyDown: true)
-        keyDown?.postToPid(pid)
-
-        let keyUp = CGEvent(keyboardEventSource: nil, virtualKey: 36, keyDown: false)
-        keyUp?.postToPid(pid)
     }
 }

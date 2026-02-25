@@ -112,25 +112,56 @@ final class OverlayWindowService {
     private func showHighlightWindows() {
         hideHighlightWindows()
 
-        // Get dialog bounds in CG coords (top-left origin) to exclude overlap
-        // Also include the overlay panel bounds
+        // Build exclusion rects from CGWindowList (accurate on-screen bounds)
+        // so highlights don't cover the dialog. We only exclude the dialog
+        // window itself (smallest window containing the dialog center), NOT
+        // the parent app window behind it.
         var excludeRects: [CGRect] = []
-        if !dialogBoundsCG.isEmpty {
-            excludeRects.append(dialogBoundsCG)
+        let dialogCenter = CGPoint(x: dialogBoundsCG.midX, y: dialogBoundsCG.midY)
+
+        if let dialog = currentDialog,
+           let windowList = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] {
+            // Collect all windows from the dialog's PID that contain the dialog center
+            var candidateRects: [CGRect] = []
+            for entry in windowList {
+                guard let pidVal = entry[kCGWindowOwnerPID as String] as? Int,
+                      pid_t(pidVal) == dialog.pid,
+                      let boundsDict = entry[kCGWindowBounds as String] as? [String: CGFloat],
+                      let x = boundsDict["X"], let y = boundsDict["Y"],
+                      let w = boundsDict["Width"], let h = boundsDict["Height"] else { continue }
+                let rect = CGRect(x: x, y: y, width: w, height: h)
+                if rect.contains(dialogCenter) {
+                    candidateRects.append(rect)
+                    debugLog("Candidate rect (PID \(dialog.pid)): (\(x),\(y),\(w),\(h)) area=\(w*h)")
+                }
+            }
+            // Exclude all dialog-related windows EXCEPT the largest one (the parent app window).
+            // This clips highlights around the dialog sheet and any sub-panels,
+            // but lets highlights still appear over the parent app window.
+            if candidateRects.count > 1 {
+                let maxArea = candidateRects.map { $0.width * $0.height }.max() ?? 0
+                for rect in candidateRects where rect.width * rect.height < maxArea {
+                    excludeRects.append(rect.insetBy(dx: -4, dy: -4))
+                    debugLog("Exclude dialog rect: \(rect)")
+                }
+            } else if let only = candidateRects.first {
+                // Only one window (dialog IS the top-level window) — exclude it
+                excludeRects.append(only.insetBy(dx: -4, dy: -4))
+                debugLog("Exclude single dialog rect: \(only)")
+            }
         }
+
+        // Also exclude the overlay sidebar panel
         if let panel = overlayPanel, let screen = NSScreen.main {
             let pf = panel.frame
-            let cgY = screen.frame.height - pf.origin.y - pf.height
-            excludeRects.append(CGRect(x: pf.origin.x, y: cgY, width: pf.width, height: pf.height))
+            let cgPanelY = screen.frame.height - pf.origin.y - pf.height
+            let panelCG = CGRect(x: pf.origin.x, y: cgPanelY, width: pf.width, height: pf.height)
+            excludeRects.append(panelCG.insetBy(dx: -4, dy: -4))
         }
 
         for (colorIndex, fw) in appState.finderWindows.enumerated() {
-            // Compute visible portion of this Finder window (exclude dialog/overlay overlap)
-            let visibleBounds = subtractRects(from: fw.bounds, excluding: excludeRects)
-            if visibleBounds.isEmpty { continue }
-
-            // Create highlight windows for each visible region (same color for same Finder window)
-            for region in visibleBounds {
+            let visibleRegions = subtractRects(from: fw.bounds, excluding: excludeRects)
+            for region in visibleRegions {
                 let clippedFW = FinderWindow(windowID: fw.windowID, title: fw.title, bounds: region, path: fw.path)
                 let hw = HighlightWindow(finderWindow: clippedFW, colorIndex: colorIndex)
                 hw.onClick = { [weak self] in
@@ -141,7 +172,15 @@ final class OverlayWindowService {
                 highlightWindows.append(hw)
             }
         }
-        debugLog("Showed \(highlightWindows.count) highlight windows (excluding dialog overlap)")
+
+        // Re-activate the dialog's app so its window (with the Open/Save dialog)
+        // comes back above the highlights. The sidebar panel at .screenSaver level
+        // stays on top regardless.
+        if let dialog = currentDialog {
+            NSRunningApplication(processIdentifier: dialog.pid)?.activate()
+        }
+
+        debugLog("Showed \(highlightWindows.count) highlight windows (clipped around \(excludeRects.count) exclusion rects)")
     }
 
     /// Subtract excluding rects from a source rect, returning visible regions.

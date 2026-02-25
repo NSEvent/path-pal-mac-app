@@ -177,20 +177,19 @@ final class OverlayWindowService {
     }
 
     /// Determine which windows from the dialog's PID should be excluded from highlights.
-    /// Excludes any PID window that overlaps significantly (>10% of its area) with the
-    /// dialog bounds, plus 20px padding for shadows. This catches the dialog itself,
-    /// its parent app window, toolbars, and other overlapping app windows — but not
-    /// unrelated windows from the same app at different screen positions.
+    /// Excludes PID windows that overlap at least 50% of the dialog's area — this catches
+    /// the dialog itself and its parent/host window, but not unrelated windows from the
+    /// same app at different screen positions.
     static func dialogExclusionRects(dialogBounds: CGRect, pidRects: [CGRect]) -> [CGRect] {
         guard !dialogBounds.isEmpty else { return [] }
+        let dialogArea = dialogBounds.width * dialogBounds.height
+        guard dialogArea > 0 else { return [] }
         var result: [CGRect] = []
         for rect in pidRects {
             let intersection = rect.intersection(dialogBounds)
             guard !intersection.isNull && !intersection.isEmpty else { continue }
             let overlapArea = intersection.width * intersection.height
-            let windowArea = rect.width * rect.height
-            guard windowArea > 0 else { continue }
-            if overlapArea / windowArea > 0.1 {
+            if overlapArea / dialogArea > 0.5 {
                 result.append(rect.insetBy(dx: -20, dy: -20))
             }
         }

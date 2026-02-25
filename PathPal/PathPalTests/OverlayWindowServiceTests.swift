@@ -259,7 +259,7 @@ final class OverlayWindowServiceTests: XCTestCase {
     func testDialogExclusionIncludesToolbar() {
         let exclusions = OverlayWindowService.dialogExclusionRects(
             dialogBounds: realDialogBounds, pidRects: realPidRects)
-        // Toolbar [1] is fully within the dialog — must be excluded
+        // Toolbar [1] is fully within the dialog — covered by dialog's exclusion rect
         XCTAssertTrue(exclusions.contains { $0.contains(realPidRects[1]) },
             "Toolbar must be excluded")
     }
@@ -267,7 +267,7 @@ final class OverlayWindowServiceTests: XCTestCase {
     func testDialogExclusionIncludesChromeParent() {
         let exclusions = OverlayWindowService.dialogExclusionRects(
             dialogBounds: realDialogBounds, pidRects: realPidRects)
-        // Chrome parent [2] overlaps ~87% — must be excluded
+        // Chrome parent [2] covers ~99% of dialog area — must be excluded
         XCTAssertTrue(exclusions.contains { $0.contains(realPidRects[2]) },
             "Chrome parent must be excluded")
     }
@@ -275,7 +275,7 @@ final class OverlayWindowServiceTests: XCTestCase {
     func testDialogExclusionIncludesOverlappingChromeWindow() {
         let exclusions = OverlayWindowService.dialogExclusionRects(
             dialogBounds: realDialogBounds, pidRects: realPidRects)
-        // Window [4] overlaps ~84% — must be excluded
+        // Window [4] covers ~78% of dialog area — must be excluded
         XCTAssertTrue(exclusions.contains { $0.contains(realPidRects[4]) },
             "Overlapping Chrome window must be excluded")
     }
@@ -283,7 +283,7 @@ final class OverlayWindowServiceTests: XCTestCase {
     func testDialogExclusionExcludesUnrelatedChromeWindow() {
         let exclusions = OverlayWindowService.dialogExclusionRects(
             dialogBounds: realDialogBounds, pidRects: realPidRects)
-        // Window [3] only overlaps ~1.4% — must NOT be excluded
+        // Window [3] covers ~3.8% of dialog area — must NOT be excluded
         XCTAssertFalse(exclusions.contains { $0.contains(realPidRects[3]) },
             "Unrelated Chrome window at different position must not be excluded")
     }

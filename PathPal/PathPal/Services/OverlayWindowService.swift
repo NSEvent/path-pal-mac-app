@@ -252,7 +252,7 @@ final class OverlayWindowService {
     }
 
     private func checkClickOnFinderWindow(at cgPoint: CGPoint) {
-        guard currentDialog != nil, !finderWindows.isEmpty else { return }
+        guard currentDialog != nil else { return }
         guard let screen = NSScreen.main else { return }
 
         // Don't intercept clicks on the overlay panel
@@ -263,15 +263,12 @@ final class OverlayWindowService {
             if cgPanelRect.contains(cgPoint) { return }
         }
 
-        // Don't intercept clicks on highlight windows — they handle clicks themselves
-        for hw in highlightWindows.reversed() {
-            let hf = hw.frame
-            let cgHwY = screen.frame.height - hf.origin.y - hf.height
-            let cgHwRect = CGRect(x: hf.origin.x, y: cgHwY, width: hf.width, height: hf.height)
-            if cgHwRect.contains(cgPoint) { return }
-        }
+        // When highlights are active, they handle clicks via their own mouseDown.
+        // The event tap (listenOnly) can't consume events, so both fire.
+        // Skip navigation here to avoid double-navigating.
+        if !highlightWindows.isEmpty { return }
 
-        // Check if click landed on any Finder window (bounds are already in CG top-left coords)
+        // Fallback: raw Finder window bounds (only when highlights are disabled)
         if let matched = finderWindows.first(where: { $0.bounds.contains(cgPoint) }) {
             debugLog("Click matched Finder window: \(matched.name) path=\(matched.path)")
             DispatchQueue.main.async { [weak self] in

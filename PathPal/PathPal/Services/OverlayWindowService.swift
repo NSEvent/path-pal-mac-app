@@ -133,7 +133,7 @@ final class OverlayWindowService {
             let pf = panel.frame
             let cgPanelY = screen.frame.height - pf.origin.y - pf.height
             let panelCG = CGRect(x: pf.origin.x, y: cgPanelY, width: pf.width, height: pf.height)
-            excludeRects.append(panelCG.insetBy(dx: -4, dy: -4))
+            excludeRects.append(panelCG.insetBy(dx: -12, dy: -12))
         }
 
         for (colorIndex, fw) in appState.finderWindows.enumerated() {
@@ -198,10 +198,10 @@ final class OverlayWindowService {
                 if rectArea > dialogArea * 2 {
                     // Oversized parent window (e.g. fullscreen Chrome) — only
                     // exclude the dialog-sized region, not the entire window.
-                    result.append(dialogBounds.insetBy(dx: -20, dy: -20))
+                    result.append(dialogBounds.insetBy(dx: -40, dy: -40))
                 } else {
                     // Dialog-sized window — exclude at full size.
-                    result.append(rect.insetBy(dx: -20, dy: -20))
+                    result.append(rect.insetBy(dx: -40, dy: -40))
                 }
             }
         }

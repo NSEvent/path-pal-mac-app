@@ -157,4 +157,64 @@ final class HighlightWindowTests: XCTestCase {
             seen.insert(desc)
         }
     }
+
+    // MARK: - Label Layout
+
+    func testLabelLayoutAssignsOneLabelPerFinderWindow() {
+        let regions = [
+            HighlightLabelRegion(
+                windowIndex: 0,
+                regionIndex: 0,
+                bounds: CGRect(x: 0, y: 0, width: 500, height: 260),
+                path: "/Users/kevin/Documents"
+            ),
+            HighlightLabelRegion(
+                windowIndex: 0,
+                regionIndex: 1,
+                bounds: CGRect(x: 520, y: 0, width: 300, height: 260),
+                path: "/Users/kevin/Documents"
+            ),
+        ]
+
+        let assignments = HighlightLabelLayout.assignments(for: regions)
+
+        XCTAssertEqual(assignments.count, 1)
+        XCTAssertEqual(assignments.keys.first?.windowIndex, 0)
+    }
+
+    func testLabelLayoutAvoidsOverlappingLabels() {
+        let regions = [
+            HighlightLabelRegion(
+                windowIndex: 0,
+                regionIndex: 0,
+                bounds: CGRect(x: 0, y: 0, width: 420, height: 240),
+                path: "/Users/kevin/Documents"
+            ),
+            HighlightLabelRegion(
+                windowIndex: 1,
+                regionIndex: 0,
+                bounds: CGRect(x: 0, y: 0, width: 420, height: 240),
+                path: "/Users/kevin/Downloads"
+            ),
+        ]
+
+        let frames = Array(HighlightLabelLayout.assignments(for: regions).values)
+
+        XCTAssertEqual(frames.count, 2)
+        XCTAssertFalse(frames[0].intersects(frames[1]))
+    }
+
+    func testLabelLayoutKeepsLabelsInsideRegions() throws {
+        let region = HighlightLabelRegion(
+            windowIndex: 0,
+            regionIndex: 0,
+            bounds: CGRect(x: 50, y: 80, width: 320, height: 180),
+            path: "/Users/kevin/Projects/folder-buddy-mac-app"
+        )
+
+        let assignments = HighlightLabelLayout.assignments(for: [region])
+        let frame = try XCTUnwrap(assignments[region.id])
+
+        XCTAssertTrue(region.bounds.contains(frame))
+    }
 }

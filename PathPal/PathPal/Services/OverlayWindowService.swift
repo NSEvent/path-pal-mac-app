@@ -143,40 +143,57 @@ final class OverlayWindowService {
 
         let clickEnabled = SettingsService.shared.clickFinderWindowToChoose
 
+        var labelRegions: [HighlightLabelRegion] = []
+        var highlightSpecs: [(id: HighlightLabelRegionID, finderWindow: FinderWindow, title: String, path: String, colorIndex: Int)] = []
+
         for (colorIndex, fw) in appState.finderWindows.enumerated() {
             let visibleRegions = subtractRects(from: fw.bounds, excluding: excludeRects)
-            for region in visibleRegions {
+            for (regionIndex, region) in visibleRegions.enumerated() {
                 let clippedFW = FinderWindow(windowID: fw.windowID, title: fw.title, bounds: region, path: fw.path)
-                let hw = HighlightWindow(finderWindow: clippedFW, colorIndex: colorIndex)
-                hw.ignoresMouseEvents = !clickEnabled
-                hw.onClick = { [weak self] in
-                    guard let self = self else { return }
-                    guard SettingsService.shared.clickFinderWindowToChoose else { return }
-                    let mouseLocation = NSEvent.mouseLocation
-                    guard let screen = NSScreen.main else { return }
-                    let cgY = screen.frame.height - mouseLocation.y
-                    let cgPoint = CGPoint(x: mouseLocation.x, y: cgY)
-
-                    // Check if click is on any pill label (topmost first)
-                    for candidate in self.highlightWindows.reversed() {
-                        if candidate.pillFrameInScreenCG.contains(cgPoint) {
-                            debugLog("Pill click: \(candidate.finderPath)")
-                            self.navigateDialog(toPath: candidate.finderPath)
-                            return
-                        }
-                    }
-
-                    // No pill hit — navigate to clicked highlight's path
-                    debugLog("Highlight click: \(fw.title) path=\(fw.path)")
-                    self.navigateDialog(toPath: fw.path)
-                }
-                hw.onRightClick = { [weak self, weak hw] in
-                    guard let self = self, let hw = hw else { return }
-                    self.dismissHighlightWindow(hw)
-                }
-                hw.orderFrontRegardless()
-                highlightWindows.append(hw)
+                let id = HighlightLabelRegionID(windowIndex: colorIndex, regionIndex: regionIndex)
+                labelRegions.append(HighlightLabelRegion(windowIndex: colorIndex, regionIndex: regionIndex, bounds: region, path: fw.path))
+                highlightSpecs.append((id: id, finderWindow: clippedFW, title: fw.title, path: fw.path, colorIndex: colorIndex))
             }
+        }
+
+        let labelFrames = HighlightLabelLayout.assignments(for: labelRegions)
+
+        for spec in highlightSpecs {
+            let labelFrame = labelFrames[spec.id]
+            let hw = HighlightWindow(
+                finderWindow: spec.finderWindow,
+                colorIndex: spec.colorIndex,
+                labelFrameInScreenCG: labelFrame,
+                showsLabel: labelFrame != nil
+            )
+            hw.ignoresMouseEvents = !clickEnabled
+            hw.onClick = { [weak self] in
+                guard let self = self else { return }
+                guard SettingsService.shared.clickFinderWindowToChoose else { return }
+                let mouseLocation = NSEvent.mouseLocation
+                guard let screen = NSScreen.main else { return }
+                let cgY = screen.frame.height - mouseLocation.y
+                let cgPoint = CGPoint(x: mouseLocation.x, y: cgY)
+
+                // Check if click is on any pill label (topmost first)
+                for candidate in self.highlightWindows.reversed() {
+                    if candidate.pillFrameInScreenCG.contains(cgPoint) {
+                        debugLog("Pill click: \(candidate.finderPath)")
+                        self.navigateDialog(toPath: candidate.finderPath)
+                        return
+                    }
+                }
+
+                // No pill hit - navigate to clicked highlight's path
+                debugLog("Highlight click: \(spec.title) path=\(spec.path)")
+                self.navigateDialog(toPath: spec.path)
+            }
+            hw.onRightClick = { [weak self, weak hw] in
+                guard let self = self, let hw = hw else { return }
+                self.dismissHighlightWindow(hw)
+            }
+            hw.orderFrontRegardless()
+            highlightWindows.append(hw)
         }
 
         // Re-activate the dialog's app so its window (with the Open/Save dialog)

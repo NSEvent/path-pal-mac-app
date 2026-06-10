@@ -32,7 +32,12 @@ final class HighlightWindow: NSPanel {
     var finderPath: String { finderWindowInfo.path }
     private let finderWindowInfo: FinderWindow
 
-    init(finderWindow: FinderWindow, colorIndex: Int = 0) {
+    init(
+        finderWindow: FinderWindow,
+        colorIndex: Int = 0,
+        labelFrameInScreenCG: CGRect? = nil,
+        showsLabel: Bool = true
+    ) {
         self.finderWindowInfo = finderWindow
 
         let color = HighlightColor.forIndex(colorIndex)
@@ -66,11 +71,16 @@ final class HighlightWindow: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .stationary]
 
         // Show last 2 path components for context (e.g. "Projects/MyApp")
-        let displayName = Self.shortPath(finderWindow.path)
+        let displayName = HighlightLabelLayout.displayName(for: finderWindow.path)
+        let resolvedLabelFrame = labelFrameInScreenCG ?? Self.defaultLabelFrameInScreenCG(for: finderWindow)
+        let labelFrame = showsLabel ? resolvedLabelFrame.map {
+            Self.convertLabelFrameToWindowCoordinates($0, windowBoundsCG: finderWindow.bounds)
+        } : nil
 
         let view = HighlightView(frame: NSRect(origin: .zero, size: frame.size),
                                  folderName: displayName,
-                                 color: color)
+                                 color: color,
+                                 labelFrame: labelFrame)
         view.onClick = { [weak self] in self?.onClick?() }
         view.onRightClick = { [weak self] in self?.onRightClick?() }
         contentView = view
@@ -90,14 +100,23 @@ final class HighlightWindow: NSPanel {
                       height: screenFrame.height)
     }
 
-    /// Returns the last 2 path components, or just the name for shallow paths.
-    private static func shortPath(_ path: String) -> String {
-        let components = URL(fileURLWithPath: path).pathComponents
-        // pathComponents includes "/" as first element
-        if components.count >= 3 {
-            return components.suffix(2).joined(separator: "/")
-        }
-        return URL(fileURLWithPath: path).lastPathComponent
+    private static func convertLabelFrameToWindowCoordinates(_ labelFrameCG: CGRect, windowBoundsCG: CGRect) -> CGRect {
+        CGRect(
+            x: labelFrameCG.minX - windowBoundsCG.minX,
+            y: windowBoundsCG.maxY - labelFrameCG.maxY,
+            width: labelFrameCG.width,
+            height: labelFrameCG.height
+        )
+    }
+
+    private static func defaultLabelFrameInScreenCG(for finderWindow: FinderWindow) -> CGRect? {
+        let region = HighlightLabelRegion(
+            windowIndex: 0,
+            regionIndex: 0,
+            bounds: finderWindow.bounds,
+            path: finderWindow.path
+        )
+        return HighlightLabelLayout.assignments(for: [region])[region.id]
     }
 }
 
@@ -108,14 +127,17 @@ class HighlightView: NSView {
     private let pillView: NSView
     private let pillTintLayer: CALayer
     private let highlightColor: HighlightColor
+    private let labelFrame: CGRect?
 
     /// Pill label frame in window coordinates (for converting to screen coords).
     var pillFrameInWindow: CGRect {
-        pillView.convert(pillView.bounds, to: nil)
+        guard !pillView.isHidden else { return .zero }
+        return pillView.convert(pillView.bounds, to: nil)
     }
 
-    init(frame: NSRect, folderName: String, color: HighlightColor) {
+    init(frame: NSRect, folderName: String, color: HighlightColor, labelFrame: CGRect?) {
         self.highlightColor = color
+        self.labelFrame = labelFrame
 
         // Build the pill label using vibrancy material with colored tint
         let icon = NSImageView()
@@ -149,7 +171,8 @@ class HighlightView: NSView {
         // Subtle inner border for definition against complex backgrounds
         pill.layer?.borderWidth = 1
         pill.layer?.borderColor = NSColor.white.withAlphaComponent(0.15).cgColor
-        pill.translatesAutoresizingMaskIntoConstraints = false
+        pill.translatesAutoresizingMaskIntoConstraints = true
+        pill.isHidden = labelFrame == nil
         pill.addSubview(effectView)
         pill.addSubview(icon)
         pill.addSubview(label)
@@ -177,12 +200,6 @@ class HighlightView: NSView {
             label.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 5),
             label.trailingAnchor.constraint(equalTo: pill.trailingAnchor, constant: -12),
             label.centerYAnchor.constraint(equalTo: pill.centerYAnchor),
-
-            // Pill sizing and position — bottom center
-            pill.centerXAnchor.constraint(equalTo: self.centerXAnchor),
-            pill.bottomAnchor.constraint(equalTo: self.bottomAnchor, constant: -10),
-            pill.heightAnchor.constraint(equalToConstant: 26),
-            pill.widthAnchor.constraint(lessThanOrEqualTo: self.widthAnchor, constant: -20),
         ])
     }
 
@@ -190,6 +207,10 @@ class HighlightView: NSView {
 
     override func layout() {
         super.layout()
+        if let labelFrame {
+            pillView.frame = labelFrame
+        }
+
         // Ensure tint layer is added and sized to fill the effect view
         if pillTintLayer.superlayer == nil {
             if let effectView = pillView.subviews.first as? NSVisualEffectView {
@@ -215,16 +236,20 @@ class HighlightView: NSView {
     override func mouseEntered(with event: NSEvent) {
         isHovering = true
         window?.backgroundColor = highlightColor.nsColor.withAlphaComponent(0.18)
-        pillTintLayer.backgroundColor = highlightColor.nsColor.withAlphaComponent(0.7).cgColor
-        pillView.layer?.borderColor = NSColor.white.withAlphaComponent(0.25).cgColor
+        if !pillView.isHidden {
+            pillTintLayer.backgroundColor = highlightColor.nsColor.withAlphaComponent(0.7).cgColor
+            pillView.layer?.borderColor = NSColor.white.withAlphaComponent(0.25).cgColor
+        }
         needsDisplay = true
     }
 
     override func mouseExited(with event: NSEvent) {
         isHovering = false
         window?.backgroundColor = highlightColor.nsColor.withAlphaComponent(0.08)
-        pillTintLayer.backgroundColor = highlightColor.nsColor.withAlphaComponent(0.55).cgColor
-        pillView.layer?.borderColor = NSColor.white.withAlphaComponent(0.15).cgColor
+        if !pillView.isHidden {
+            pillTintLayer.backgroundColor = highlightColor.nsColor.withAlphaComponent(0.55).cgColor
+            pillView.layer?.borderColor = NSColor.white.withAlphaComponent(0.15).cgColor
+        }
         needsDisplay = true
     }
 

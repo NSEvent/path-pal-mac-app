@@ -54,6 +54,7 @@
 		ED8971AF0CB6453298607973 /* AppStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55AA32B1BEB94369B00C514C /* AppStateTests.swift */; };
 		343119790C304653891F8505 /* HighlightWindowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A87A2E885BC46F99AB85393 /* HighlightWindowTests.swift */; };
 		083DAE2AEFC746E9B4C9435B /* FinderFavoritesServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30DBD1CDBB7941B4929358D4 /* FinderFavoritesServiceTests.swift */; };
+		60D5EE5F37E34DC1A1190D97 /* HighlightLabelLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE191CB0EE64429190FFA3D2 /* HighlightLabelLayout.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -141,6 +142,7 @@
 		55AA32B1BEB94369B00C514C /* AppStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStateTests.swift; sourceTree = "<group>"; };
 		2A87A2E885BC46F99AB85393 /* HighlightWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HighlightWindowTests.swift; sourceTree = "<group>"; };
 		30DBD1CDBB7941B4929358D4 /* FinderFavoritesServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderFavoritesServiceTests.swift; sourceTree = "<group>"; };
+		FE191CB0EE64429190FFA3D2 /* HighlightLabelLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HighlightLabelLayout.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -248,7 +250,7 @@
 				A20019000000000000000019 /* OverlayPanel.swift */,
 				A2001A00000000000000001A /* PathBarPanel.swift */,
 				A2001B00000000000000001B /* HighlightWindow.swift */,
-			);
+				FE191CB0EE64429190FFA3D2 /* HighlightLabelLayout.swift */,);
 			path = Windows;
 			sourceTree = "<group>";
 		};
@@ -466,7 +468,8 @@
 				A10019000000000000000019 /* OverlayPanel.swift in Sources */,
 				A1001A00000000000000001A /* PathBarPanel.swift in Sources */,
 				A1001B00000000000000001B /* HighlightWindow.swift in Sources */,
-				45C13966331448C781805698 /* FinderFavoritesService.swift in Sources */,);
+				45C13966331448C781805698 /* FinderFavoritesService.swift in Sources */,
+				60D5EE5F37E34DC1A1190D97 /* HighlightLabelLayout.swift in Sources */,);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		AA0002000000000000000002 /* Sources */ = {

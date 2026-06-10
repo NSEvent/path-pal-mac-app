@@ -59,7 +59,7 @@ final class OverlayWindowService {
         let panel = OverlayPanel()
         panel.contentView = makeOverlayContent(finderWindows: appState.finderWindows, dialogType: dialog.type)
         positionOverlay(panel, relativeTo: dialog)
-        panel.orderFrontRegardless()
+        panel.orderFrontWithEntranceAnimation()
         overlayPanel = panel
 
         // Start monitors immediately; Finder windows populate asynchronously.
@@ -156,6 +156,7 @@ final class OverlayWindowService {
 
     private func showHighlightWindows() {
         let oldHighlightWindows = highlightWindows
+        let shouldAnimateEntrance = oldHighlightWindows.isEmpty
         highlightWindows.removeAll(keepingCapacity: true)
 
         var excludeRects: [CGRect] = []
@@ -233,7 +234,12 @@ final class OverlayWindowService {
                 guard let self = self, let hw = hw else { return }
                 self.dismissHighlightWindow(hw)
             }
-            hw.orderFrontRegardless()
+            if shouldAnimateEntrance {
+                hw.orderFrontWithEntranceAnimation(sequenceIndex: highlightWindows.count)
+            } else {
+                hw.alphaValue = 1
+                hw.orderFrontRegardless()
+            }
             highlightWindows.append(hw)
         }
 

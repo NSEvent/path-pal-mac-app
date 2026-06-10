@@ -109,11 +109,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func updateRecentFromFinder() {
         DispatchQueue.global(qos: .utility).async { [weak self] in
-            let windows = FinderScriptingService.shared.getFinderWindows()
+            let windows = FinderScriptingService.shared.getFinderWindowsWithBounds().enumerated().map { index, window in
+                FinderWindow(
+                    windowID: CGWindowID(index),
+                    title: window.name,
+                    bounds: window.bounds,
+                    path: window.path
+                )
+            }
             DispatchQueue.main.async {
                 for window in windows {
                     self?.recentItemsService.addFolder(window.path)
                 }
+                self?.appState.finderWindows = windows
+                self?.appState.finderWindowsUpdatedAt = Date()
                 self?.appState.recentFolders = self?.recentItemsService.recentFolders ?? []
                 self?.appState.recentFiles = self?.recentItemsService.recentFiles ?? []
                 self?.menuBarService.refreshMenu()

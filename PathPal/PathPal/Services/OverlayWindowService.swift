@@ -26,13 +26,23 @@ final class OverlayWindowService {
     private var runLoopSource: CFRunLoopSource?
     private var clickMonitor: Any?
     private var moveMonitor: Any?
+    private var localMoveMonitor: Any?
     private var dialogFrameTimer: Timer?
     private var currentDialog: DialogInfo?
     private var overlayRequestID = 0
     private var dialogBoundsCG: CGRect = .zero  // Dialog bounds in CG coords (top-left origin)
     private var finderWindows: [(name: String, path: String, bounds: CGRect)] = []
+    private var hoveredFinderWindowID: CGWindowID?
     private let appState: AppState
     private let dialogNavigationService = DialogNavigationService()
+    private static let finderWindowCacheMaxAge: TimeInterval = 15
+
+    private struct HighlightHitTarget {
+        let windowID: CGWindowID
+        let name: String
+        let path: String
+        let bounds: CGRect
+    }
 
     init(appState: AppState) {
         self.appState = appState
@@ -59,6 +69,14 @@ final class OverlayWindowService {
 
         debugLog("Overlay panel shown, isVisible=\(panel.isVisible), level=\(panel.level.rawValue), frame=\(panel.frame)")
 
+        if SettingsService.shared.highlightFinderWindows, hasFreshCachedFinderWindows {
+            finderWindows = appState.finderWindows.map {
+                (name: $0.title, path: $0.path, bounds: $0.bounds)
+            }
+            debugLog("Showing cached Finder highlights: \(appState.finderWindows.count) windows")
+            showHighlightWindows()
+        }
+
         // Get Finder windows on a background thread so the overlay appears immediately.
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let windows = FinderScriptingService.shared.getFinderWindowsWithBounds().enumerated().map { index, window in
@@ -75,7 +93,12 @@ final class OverlayWindowService {
                       self.currentDialog != nil,
                       let panel = self.overlayPanel else { return }
 
+                let previousFinderWindows = self.appState.finderWindows
+                let shouldRefreshHighlights = self.highlightWindows.isEmpty
+                    || !Self.finderWindowsVisuallyEqual(previousFinderWindows, windows)
+
                 self.appState.finderWindows = windows
+                self.appState.finderWindowsUpdatedAt = Date()
                 self.finderWindows = windows.map {
                     (name: $0.title, path: $0.path, bounds: $0.bounds)
                 }
@@ -83,7 +106,12 @@ final class OverlayWindowService {
                 debugLog("Found \(windows.count) Finder windows")
 
                 if SettingsService.shared.highlightFinderWindows {
-                    self.showHighlightWindows()
+                    if shouldRefreshHighlights {
+                        self.showHighlightWindows()
+                    } else {
+                        debugLog("Skipped Finder highlight rebuild; fresh bounds match cache")
+                        self.handleGlobalMove()
+                    }
                 }
             }
         }
@@ -103,6 +131,7 @@ final class OverlayWindowService {
         currentDialog = nil
         dialogBoundsCG = .zero
         finderWindows = []
+        hoveredFinderWindowID = nil
     }
 
     private func makeOverlayContent(finderWindows: [FinderWindow], dialogType: DialogType) -> NSView {
@@ -153,32 +182,36 @@ final class OverlayWindowService {
             excludeRects.append(panelCG.insetBy(dx: -12, dy: -12))
         }
 
-        let clickEnabled = SettingsService.shared.clickFinderWindowToChoose
-
         var labelRegions: [HighlightLabelRegion] = []
-        var highlightSpecs: [(id: HighlightLabelRegionID, finderWindow: FinderWindow, title: String, path: String, colorIndex: Int)] = []
+        var highlightSpecs: [
+            (finderWindow: FinderWindow, visibleRegions: [CGRect], labelIDs: [HighlightLabelRegionID], colorIndex: Int)
+        ] = []
 
         for (colorIndex, fw) in appState.finderWindows.enumerated() {
             let visibleRegions = subtractRects(from: fw.bounds, excluding: excludeRects)
+            guard !visibleRegions.isEmpty else { continue }
+            var labelIDs: [HighlightLabelRegionID] = []
             for (regionIndex, region) in visibleRegions.enumerated() {
-                let clippedFW = FinderWindow(windowID: fw.windowID, title: fw.title, bounds: region, path: fw.path)
                 let id = HighlightLabelRegionID(windowIndex: colorIndex, regionIndex: regionIndex)
+                labelIDs.append(id)
                 labelRegions.append(HighlightLabelRegion(windowIndex: colorIndex, regionIndex: regionIndex, bounds: region, path: fw.path))
-                highlightSpecs.append((id: id, finderWindow: clippedFW, title: fw.title, path: fw.path, colorIndex: colorIndex))
             }
+            highlightSpecs.append((finderWindow: fw, visibleRegions: visibleRegions, labelIDs: labelIDs, colorIndex: colorIndex))
         }
 
         let labelFrames = HighlightLabelLayout.assignments(for: labelRegions)
 
         for spec in highlightSpecs {
-            let labelFrame = labelFrames[spec.id]
+            let windowLabelFrames = spec.labelIDs.compactMap { labelFrames[$0] }
             let hw = HighlightWindow(
                 finderWindow: spec.finderWindow,
                 colorIndex: spec.colorIndex,
-                labelFrameInScreenCG: labelFrame,
-                showsLabel: labelFrame != nil
+                visibleRegionsInScreenCG: spec.visibleRegions,
+                labelFramesInScreenCG: windowLabelFrames
             )
-            hw.ignoresMouseEvents = !clickEnabled
+            // Large merged highlight panels may span transparent holes over the save dialog.
+            // Keep them mouse-through and route Finder picks through the global click monitor.
+            hw.ignoresMouseEvents = true
             hw.onClick = { [weak self] in
                 guard let self = self else { return }
                 guard SettingsService.shared.clickFinderWindowToChoose else { return }
@@ -187,18 +220,14 @@ final class OverlayWindowService {
                 let cgY = screen.frame.height - mouseLocation.y
                 let cgPoint = CGPoint(x: mouseLocation.x, y: cgY)
 
-                // Check if click is on any pill label (topmost first)
-                for candidate in self.highlightWindows.reversed() {
-                    if candidate.pillFrameInScreenCG.contains(cgPoint) {
-                        debugLog("Pill click: \(candidate.finderPath)")
-                        self.navigateDialog(toPath: candidate.finderPath)
-                        return
-                    }
+                if let target = self.highlightTarget(at: cgPoint) {
+                    debugLog("Highlight click: \(target.name) path=\(target.path)")
+                    self.navigateDialog(toPath: target.path)
+                    return
                 }
 
-                // No pill hit - navigate to clicked highlight's path
-                debugLog("Highlight click: \(spec.title) path=\(spec.path)")
-                self.navigateDialog(toPath: spec.path)
+                debugLog("Highlight click: \(spec.finderWindow.title) path=\(spec.finderWindow.path)")
+                self.navigateDialog(toPath: spec.finderWindow.path)
             }
             hw.onRightClick = { [weak self, weak hw] in
                 guard let self = self, let hw = hw else { return }
@@ -208,7 +237,9 @@ final class OverlayWindowService {
             highlightWindows.append(hw)
         }
 
+        applyHighlightedFinderWindow()
         oldHighlightWindows.forEach { $0.orderOut(nil) }
+        handleGlobalMove()
 
         // Re-activate the dialog's app so its window (with the Open/Save dialog)
         // comes back above the highlights. The sidebar panel at .screenSaver level
@@ -217,7 +248,7 @@ final class OverlayWindowService {
             NSRunningApplication(processIdentifier: dialog.pid)?.activate()
         }
 
-        debugLog("Showed \(highlightWindows.count) highlight windows (clipped around \(excludeRects.count) exclusion rects)")
+        debugLog("Showed \(highlightWindows.count) highlight windows with \(labelRegions.count) visible regions (clipped around \(excludeRects.count) exclusion rects)")
     }
 
     /// Determine which windows from the dialog's PID should be excluded from highlights.
@@ -288,8 +319,13 @@ final class OverlayWindowService {
     }
 
     private func dismissHighlightWindow(_ hw: HighlightWindow) {
+        let removedWindowID = hw.finderWindowID
         hw.orderOut(nil)
         highlightWindows.removeAll { $0 === hw }
+        if hoveredFinderWindowID == removedWindowID,
+           !highlightWindows.contains(where: { $0.finderWindowID == removedWindowID }) {
+            setHoveredFinderWindow(nil)
+        }
         hideTooltip()
     }
 
@@ -298,6 +334,7 @@ final class OverlayWindowService {
             hw.orderOut(nil)
         }
         highlightWindows.removeAll(keepingCapacity: true)
+        hoveredFinderWindowID = nil
     }
 
     private func navigateDialog(toPath path: String) {
@@ -381,9 +418,15 @@ final class OverlayWindowService {
             if cgPanelRect.contains(cgPoint) { return }
         }
 
-        // When highlights are active, they handle clicks via their own mouseDown.
-        // The event tap (listenOnly) can't consume events, so both fire.
-        // Skip navigation here to avoid double-navigating.
+        if let target = highlightTarget(at: cgPoint) {
+            debugLog("Click matched highlighted Finder window: \(target.name) path=\(target.path)")
+            DispatchQueue.main.async { [weak self] in
+                self?.hideTooltip()
+                self?.navigateDialog(toPath: target.path)
+            }
+            return
+        }
+
         if !highlightWindows.isEmpty { return }
 
         // Fallback: raw Finder window bounds (only when highlights are disabled)
@@ -418,20 +461,30 @@ final class OverlayWindowService {
 
     private func startMoveMonitor() {
         stopMoveMonitor()
-        guard SettingsService.shared.showFinderWindowNames else {
+        let needsMoveTracking = SettingsService.shared.showFinderWindowNames || SettingsService.shared.highlightFinderWindows
+        guard needsMoveTracking else {
+            setHoveredFinderWindow(nil)
             hideTooltip()
             return
         }
         moveMonitor = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
             self?.handleGlobalMove()
         }
+        localMoveMonitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
+            self?.handleGlobalMove()
+            return event
+        }
     }
 
     private var lastLoggedMove: Date = .distantPast
 
     private func handleGlobalMove() {
-        guard currentDialog != nil, !finderWindows.isEmpty else { return }
-        guard SettingsService.shared.showFinderWindowNames else {
+        guard currentDialog != nil else { return }
+
+        let wantsTooltip = SettingsService.shared.showFinderWindowNames
+        let wantsHover = SettingsService.shared.highlightFinderWindows
+        guard wantsTooltip || wantsHover else {
+            setHoveredFinderWindow(nil)
             hideTooltip()
             return
         }
@@ -443,40 +496,66 @@ final class OverlayWindowService {
 
         // Don't show tooltip over the overlay panel
         if let panel = overlayPanel, panel.frame.contains(mouseLocation) {
+            setHoveredFinderWindow(nil)
             hideTooltip()
             return
         }
 
-        // First pass: check if mouse is directly on any pill label (reverse = topmost first)
-        // Pills from lower windows should take hover priority over transparent overlay above them
-        for hw in highlightWindows.reversed() {
-            if hw.pillFrameInScreenCG.contains(cgPoint) {
-                let path = hw.finderPath
-                let name = URL(fileURLWithPath: path).lastPathComponent
-                showTooltip(for: (name: name, path: path, bounds: hw.pillFrameInScreenCG), at: mouseLocation)
-                return
+        if let target = highlightTarget(at: cgPoint) {
+            setHoveredFinderWindow(target.windowID)
+            if wantsTooltip {
+                showTooltip(for: (name: target.name, path: target.path, bounds: target.bounds), at: mouseLocation)
+            } else {
+                hideTooltip()
             }
+            return
         }
 
-        // Second pass: match against highlight windows in reverse order (last created = on top visually)
-        // so the tooltip matches the top-most window, which is what receives the click
-        for hw in highlightWindows.reversed() {
-            let hf = hw.frame
-            let cgHwY = screen.frame.height - hf.origin.y - hf.height
-            let cgHwRect = CGRect(x: hf.origin.x, y: cgHwY, width: hf.width, height: hf.height)
-            if cgHwRect.contains(cgPoint) {
-                let path = hw.finderPath
-                let name = URL(fileURLWithPath: path).lastPathComponent
-                showTooltip(for: (name: name, path: path, bounds: cgHwRect), at: mouseLocation)
-                return
-            }
-        }
+        setHoveredFinderWindow(nil)
 
-        // Fall back to raw Finder window bounds (for when highlights are disabled)
-        if highlightWindows.isEmpty, let matched = finderWindows.first(where: { $0.bounds.contains(cgPoint) }) {
+        // Fall back to raw Finder window bounds when highlights are disabled.
+        if highlightWindows.isEmpty, wantsTooltip, let matched = finderWindows.first(where: { $0.bounds.contains(cgPoint) }) {
             showTooltip(for: matched, at: mouseLocation)
         } else {
             hideTooltip()
+        }
+    }
+
+    private func highlightTarget(at cgPoint: CGPoint) -> HighlightHitTarget? {
+        // Labels win over overlapping transparent highlight panels.
+        for hw in highlightWindows.reversed() {
+            if let labelFrame = hw.pillFramesInScreenCG.reversed().first(where: { $0.contains(cgPoint) }) {
+                return HighlightHitTarget(
+                    windowID: hw.finderWindowID,
+                    name: URL(fileURLWithPath: hw.finderPath).lastPathComponent,
+                    path: hw.finderPath,
+                    bounds: labelFrame
+                )
+            }
+        }
+
+        for hw in highlightWindows.reversed() {
+            guard let hitFrame = hw.hitRegionFrameInScreenCG(at: cgPoint) else { continue }
+            return HighlightHitTarget(
+                windowID: hw.finderWindowID,
+                name: URL(fileURLWithPath: hw.finderPath).lastPathComponent,
+                path: hw.finderPath,
+                bounds: hitFrame
+            )
+        }
+
+        return nil
+    }
+
+    private func setHoveredFinderWindow(_ windowID: CGWindowID?) {
+        guard hoveredFinderWindowID != windowID else { return }
+        hoveredFinderWindowID = windowID
+        applyHighlightedFinderWindow()
+    }
+
+    private func applyHighlightedFinderWindow() {
+        for hw in highlightWindows {
+            hw.setHighlighted(hoveredFinderWindowID != nil && hw.finderWindowID == hoveredFinderWindowID)
         }
     }
 
@@ -485,6 +564,16 @@ final class OverlayWindowService {
             NSEvent.removeMonitor(monitor)
             moveMonitor = nil
         }
+        if let monitor = localMoveMonitor {
+            NSEvent.removeMonitor(monitor)
+            localMoveMonitor = nil
+        }
+    }
+
+    private var hasFreshCachedFinderWindows: Bool {
+        guard !appState.finderWindows.isEmpty,
+              let updatedAt = appState.finderWindowsUpdatedAt else { return false }
+        return Date().timeIntervalSince(updatedAt) <= Self.finderWindowCacheMaxAge
     }
 
     // MARK: - Tooltip
@@ -600,6 +689,26 @@ final class OverlayWindowService {
             || abs(previous.origin.y - current.origin.y) > tolerance
             || abs(previous.width - current.width) > tolerance
             || abs(previous.height - current.height) > tolerance
+    }
+
+    static func finderWindowsVisuallyEqual(_ lhs: [FinderWindow], _ rhs: [FinderWindow], tolerance: CGFloat = 1.0) -> Bool {
+        guard lhs.count == rhs.count else { return false }
+        for (left, right) in zip(lhs, rhs) {
+            guard left.windowID == right.windowID,
+                  left.title == right.title,
+                  left.path == right.path,
+                  rectsVisuallyEqual(left.bounds, right.bounds, tolerance: tolerance) else {
+                return false
+            }
+        }
+        return true
+    }
+
+    private static func rectsVisuallyEqual(_ lhs: CGRect, _ rhs: CGRect, tolerance: CGFloat) -> Bool {
+        abs(lhs.origin.x - rhs.origin.x) <= tolerance
+            && abs(lhs.origin.y - rhs.origin.y) <= tolerance
+            && abs(lhs.width - rhs.width) <= tolerance
+            && abs(lhs.height - rhs.height) <= tolerance
     }
 
     static func dialogBounds(for element: AXUIElement) -> CGRect? {

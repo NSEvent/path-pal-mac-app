@@ -105,8 +105,8 @@ final class AccessibilityService {
                 axDebugLog("Possible dialog from pid \(elementPid) (notification: \(notificationStr))")
                 // Use a unique ID to link retries for this notification
                 let notificationID = UUID()
-                // Try multiple delays to let the dialog UI fully build
-                for delay in [0.3, 0.8, 1.5] {
+                // Try quickly first; keep slower retries for apps that build sheets lazily.
+                for delay in [0.05, 0.15, 0.3, 0.8, 1.5] {
                     DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                         service.handlePossibleDialog(element: element, pid: elementPid, notificationID: notificationID)
                     }

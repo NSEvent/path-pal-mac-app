@@ -16,6 +16,7 @@ final class OverlayPanel: NSPanel {
         isOpaque = false
         backgroundColor = .clear
         hasShadow = true
+        acceptsMouseMovedEvents = true
         isMovableByWindowBackground = false
         hidesOnDeactivate = false
         collectionBehavior = [.canJoinAllSpaces, .stationary]

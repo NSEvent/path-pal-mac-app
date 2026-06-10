@@ -229,6 +229,48 @@ final class OverlayWindowServiceTests: XCTestCase {
         assertNoneOverlap(with: exclusion, rects: result)
     }
 
+    func testFinderWindowVisualEqualityAllowsSubpixelDrift() {
+        let cached = [
+            FinderWindow(
+                windowID: 1,
+                title: "Documents",
+                bounds: CGRect(x: 100, y: 200, width: 800, height: 600),
+                path: "/Users/kevin/Documents"
+            ),
+        ]
+        let fresh = [
+            FinderWindow(
+                windowID: 1,
+                title: "Documents",
+                bounds: CGRect(x: 100.5, y: 199.5, width: 800.5, height: 599.5),
+                path: "/Users/kevin/Documents"
+            ),
+        ]
+
+        XCTAssertTrue(OverlayWindowService.finderWindowsVisuallyEqual(cached, fresh))
+    }
+
+    func testFinderWindowVisualEqualityDetectsBoundsChanges() {
+        let cached = [
+            FinderWindow(
+                windowID: 1,
+                title: "Documents",
+                bounds: CGRect(x: 100, y: 200, width: 800, height: 600),
+                path: "/Users/kevin/Documents"
+            ),
+        ]
+        let fresh = [
+            FinderWindow(
+                windowID: 1,
+                title: "Documents",
+                bounds: CGRect(x: 140, y: 200, width: 800, height: 600),
+                path: "/Users/kevin/Documents"
+            ),
+        ]
+
+        XCTAssertFalse(OverlayWindowService.finderWindowsVisuallyEqual(cached, fresh))
+    }
+
     // MARK: - Dialog Exclusion Rects (real data from Chrome + multiple overlapping windows)
 
     /// Real data from user session: dialog at (558,201,1312,687), 5 Chrome PID windows.

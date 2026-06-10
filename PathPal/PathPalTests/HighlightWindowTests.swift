@@ -38,6 +38,67 @@ final class HighlightWindowTests: XCTestCase {
         XCTAssertEqual(highlightWindow.finderPath, "/Users/kevin/My Projects/Work")
     }
 
+    func testFinderWindowIDReturnsOriginalID() {
+        let finderWindow = FinderWindow(
+            windowID: 123,
+            title: "Work",
+            bounds: CGRect(x: 0, y: 0, width: 500, height: 300),
+            path: "/Users/kevin/Work"
+        )
+        let highlightWindow = HighlightWindow(finderWindow: finderWindow)
+        XCTAssertEqual(highlightWindow.finderWindowID, 123)
+    }
+
+    func testFrameInScreenCGReturnsFinderBounds() {
+        let bounds = CGRect(x: 40, y: 80, width: 500, height: 300)
+        let finderWindow = FinderWindow(
+            windowID: 124,
+            title: "Work",
+            bounds: bounds,
+            path: "/Users/kevin/Work"
+        )
+        let highlightWindow = HighlightWindow(finderWindow: finderWindow)
+        XCTAssertEqual(highlightWindow.frameInScreenCG, bounds)
+    }
+
+    func testSetHighlightedTracksHoverState() {
+        let finderWindow = FinderWindow(
+            windowID: 125,
+            title: "Work",
+            bounds: CGRect(x: 0, y: 0, width: 500, height: 300),
+            path: "/Users/kevin/Work"
+        )
+        let highlightWindow = HighlightWindow(finderWindow: finderWindow)
+
+        XCTAssertFalse(highlightWindow.isHighlightedForHover)
+        highlightWindow.setHighlighted(true)
+        XCTAssertTrue(highlightWindow.isHighlightedForHover)
+        highlightWindow.setHighlighted(false)
+        XCTAssertFalse(highlightWindow.isHighlightedForHover)
+    }
+
+    func testMultiRegionHitTestingOnlyIncludesVisibleRegions() {
+        let finderWindow = FinderWindow(
+            windowID: 126,
+            title: "Work",
+            bounds: CGRect(x: 0, y: 0, width: 500, height: 300),
+            path: "/Users/kevin/Work"
+        )
+        let regions = [
+            CGRect(x: 0, y: 0, width: 200, height: 300),
+            CGRect(x: 300, y: 0, width: 200, height: 300),
+        ]
+        let highlightWindow = HighlightWindow(
+            finderWindow: finderWindow,
+            visibleRegionsInScreenCG: regions,
+            labelFramesInScreenCG: []
+        )
+
+        XCTAssertNotNil(highlightWindow.hitRegionFrameInScreenCG(at: CGPoint(x: 100, y: 100)))
+        XCTAssertNil(highlightWindow.hitRegionFrameInScreenCG(at: CGPoint(x: 250, y: 100)))
+        XCTAssertNotNil(highlightWindow.hitRegionFrameInScreenCG(at: CGPoint(x: 400, y: 100)))
+    }
+
     // MARK: - onClick Callback
 
     func testOnClickCallbackFires() {
@@ -137,8 +198,8 @@ final class HighlightWindowTests: XCTestCase {
         let hw0 = HighlightWindow(finderWindow: fw, colorIndex: 0)
         let hw1 = HighlightWindow(finderWindow: fw, colorIndex: 1)
 
-        // Different color indices should produce different background colors
-        XCTAssertNotEqual(hw0.backgroundColor, hw1.backgroundColor)
+        // Different color indices should produce different highlight colors.
+        XCTAssertNotEqual(hw0.highlightColor, hw1.highlightColor)
     }
 
     func testColorIndexWrapsAround() {

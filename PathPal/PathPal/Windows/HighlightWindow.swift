@@ -2,7 +2,7 @@ import AppKit
 
 /// Color palette for distinguishing multiple Finder window highlights.
 /// Muted but distinct — chosen to work well as semi-transparent overlays.
-enum HighlightColor: CaseIterable {
+enum HighlightColor: CaseIterable, Equatable {
     case blue, purple, teal, orange, pink, green, indigo, coral
 
     var nsColor: NSColor {
@@ -30,17 +30,43 @@ final class HighlightWindow: NSPanel {
     var onClick: (() -> Void)?
     var onRightClick: (() -> Void)?
     var finderPath: String { finderWindowInfo.path }
+    var finderWindowID: CGWindowID { finderWindowInfo.windowID }
+    var frameInScreenCG: CGRect { finderWindowInfo.bounds }
+    var highlightColor: HighlightColor { color }
+    var pillFramesInScreenCG: [CGRect] { labelFramesInScreenCG }
+    private(set) var isHighlightedForHover = false
     private let finderWindowInfo: FinderWindow
+    private let visibleRegionsInScreenCG: [CGRect]
+    private let labelFramesInScreenCG: [CGRect]
+    private let color: HighlightColor
 
-    init(
+    convenience init(
         finderWindow: FinderWindow,
         colorIndex: Int = 0,
         labelFrameInScreenCG: CGRect? = nil,
         showsLabel: Bool = true
     ) {
+        let resolvedLabelFrame = labelFrameInScreenCG ?? Self.defaultLabelFrameInScreenCG(for: finderWindow)
+        self.init(
+            finderWindow: finderWindow,
+            colorIndex: colorIndex,
+            visibleRegionsInScreenCG: [finderWindow.bounds],
+            labelFramesInScreenCG: showsLabel ? resolvedLabelFrame.map { [$0] } ?? [] : []
+        )
+    }
+
+    init(
+        finderWindow: FinderWindow,
+        colorIndex: Int = 0,
+        visibleRegionsInScreenCG: [CGRect],
+        labelFramesInScreenCG: [CGRect]
+    ) {
         self.finderWindowInfo = finderWindow
+        self.visibleRegionsInScreenCG = visibleRegionsInScreenCG
+        self.labelFramesInScreenCG = labelFramesInScreenCG
 
         let color = HighlightColor.forIndex(colorIndex)
+        self.color = color
 
         // Convert from CGWindowList coords (top-left origin) to Cocoa coords (bottom-left origin)
         let screenFrame = NSScreen.main?.frame ?? .zero
@@ -64,49 +90,63 @@ final class HighlightWindow: NSPanel {
         worksWhenModal = true
         level = .modalPanel
         isOpaque = false
-        backgroundColor = color.nsColor.withAlphaComponent(0.08)
+        backgroundColor = .clear
         ignoresMouseEvents = false
         hasShadow = false
+        acceptsMouseMovedEvents = true
         hidesOnDeactivate = false
         isReleasedWhenClosed = false
         collectionBehavior = [.canJoinAllSpaces, .stationary]
 
         // Show last 2 path components for context (e.g. "Projects/MyApp")
         let displayName = HighlightLabelLayout.displayName(for: finderWindow.path)
-        let resolvedLabelFrame = labelFrameInScreenCG ?? Self.defaultLabelFrameInScreenCG(for: finderWindow)
-        let labelFrame = showsLabel ? resolvedLabelFrame.map {
+        let regionFrames = visibleRegionsInScreenCG.map {
+            Self.convertScreenCGFrameToWindowCoordinates($0, windowBoundsCG: finderWindow.bounds)
+        }
+        let labelFrames = labelFramesInScreenCG.map {
             Self.convertLabelFrameToWindowCoordinates($0, windowBoundsCG: finderWindow.bounds)
-        } : nil
+        }
 
         let view = HighlightView(frame: NSRect(origin: .zero, size: frame.size),
                                  folderName: displayName,
                                  color: color,
-                                 labelFrame: labelFrame)
+                                 regionFrames: regionFrames,
+                                 labelFrames: labelFrames)
         view.onClick = { [weak self] in self?.onClick?() }
         view.onRightClick = { [weak self] in self?.onRightClick?() }
         contentView = view
     }
 
+    func setHighlighted(_ highlighted: Bool) {
+        guard isHighlightedForHover != highlighted else { return }
+        isHighlightedForHover = highlighted
+        (contentView as? HighlightView)?.setHighlighted(highlighted)
+    }
+
+    func containsPointInScreenCG(_ point: CGPoint) -> Bool {
+        hitRegionFrameInScreenCG(at: point) != nil
+    }
+
+    func hitRegionFrameInScreenCG(at point: CGPoint) -> CGRect? {
+        visibleRegionsInScreenCG.reversed().first { $0.contains(point) }
+    }
+
     /// The pill label's frame in CG screen coordinates (top-left origin),
     /// used by OverlayWindowService for cross-window pill hit-testing.
     var pillFrameInScreenCG: CGRect {
-        guard let view = contentView as? HighlightView,
-              let screen = NSScreen.main else { return .zero }
-        let windowFrame = view.pillFrameInWindow
-        let screenFrame = convertToScreen(windowFrame)
-        // Convert Cocoa (bottom-left) to CG (top-left)
-        return CGRect(x: screenFrame.origin.x,
-                      y: screen.frame.height - screenFrame.origin.y - screenFrame.height,
-                      width: screenFrame.width,
-                      height: screenFrame.height)
+        pillFramesInScreenCG.first ?? .zero
     }
 
     private static func convertLabelFrameToWindowCoordinates(_ labelFrameCG: CGRect, windowBoundsCG: CGRect) -> CGRect {
+        convertScreenCGFrameToWindowCoordinates(labelFrameCG, windowBoundsCG: windowBoundsCG)
+    }
+
+    private static func convertScreenCGFrameToWindowCoordinates(_ frameCG: CGRect, windowBoundsCG: CGRect) -> CGRect {
         CGRect(
-            x: labelFrameCG.minX - windowBoundsCG.minX,
-            y: windowBoundsCG.maxY - labelFrameCG.maxY,
-            width: labelFrameCG.width,
-            height: labelFrameCG.height
+            x: frameCG.minX - windowBoundsCG.minX,
+            y: windowBoundsCG.maxY - frameCG.maxY,
+            width: frameCG.width,
+            height: frameCG.height
         )
     }
 
@@ -125,21 +165,47 @@ class HighlightView: NSView {
     var onClick: (() -> Void)?
     var onRightClick: (() -> Void)?
     private var isHovering = false
-    private let pillView: NSView
-    private let pillTintLayer: CALayer
+    private let pillViews: [NSView]
+    private let pillTintLayers: [CALayer]
     private let highlightColor: HighlightColor
-    private let labelFrame: CGRect?
+    private let regionFrames: [CGRect]
+    private let labelFrames: [CGRect]
 
     /// Pill label frame in window coordinates (for converting to screen coords).
     var pillFrameInWindow: CGRect {
-        guard !pillView.isHidden else { return .zero }
-        return pillView.convert(pillView.bounds, to: nil)
+        pillFramesInWindow.first ?? .zero
     }
 
-    init(frame: NSRect, folderName: String, color: HighlightColor, labelFrame: CGRect?) {
-        self.highlightColor = color
-        self.labelFrame = labelFrame
+    var pillFramesInWindow: [CGRect] {
+        pillViews.map { $0.convert($0.bounds, to: nil) }
+    }
 
+    init(frame: NSRect, folderName: String, color: HighlightColor, regionFrames: [CGRect], labelFrames: [CGRect]) {
+        self.highlightColor = color
+        self.regionFrames = regionFrames
+        self.labelFrames = labelFrames
+
+        var builtPills: [NSView] = []
+        var builtTintLayers: [CALayer] = []
+        for _ in labelFrames {
+            let pill = Self.makePill(folderName: folderName, color: color)
+            builtPills.append(pill.view)
+            builtTintLayers.append(pill.tintLayer)
+        }
+
+        self.pillViews = builtPills
+        self.pillTintLayers = builtTintLayers
+
+        super.init(frame: frame)
+        wantsLayer = true
+        for pill in pillViews {
+            addSubview(pill)
+        }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    private static func makePill(folderName: String, color: HighlightColor) -> (view: NSView, tintLayer: CALayer) {
         // Build the pill label using vibrancy material with colored tint
         let icon = NSImageView()
         icon.image = NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil)
@@ -173,16 +239,9 @@ class HighlightView: NSView {
         pill.layer?.borderWidth = 1
         pill.layer?.borderColor = NSColor.white.withAlphaComponent(0.15).cgColor
         pill.translatesAutoresizingMaskIntoConstraints = true
-        pill.isHidden = labelFrame == nil
         pill.addSubview(effectView)
         pill.addSubview(icon)
         pill.addSubview(label)
-
-        self.pillView = pill
-        self.pillTintLayer = tintLayer
-
-        super.init(frame: frame)
-        addSubview(pill)
 
         NSLayoutConstraint.activate([
             // Effect view fills pill
@@ -202,71 +261,66 @@ class HighlightView: NSView {
             label.trailingAnchor.constraint(equalTo: pill.trailingAnchor, constant: -12),
             label.centerYAnchor.constraint(equalTo: pill.centerYAnchor),
         ])
+        return (pill, tintLayer)
     }
 
-    required init?(coder: NSCoder) { fatalError() }
+    func setHighlighted(_ highlighted: Bool) {
+        guard isHovering != highlighted else { return }
+        isHovering = highlighted
+        updateHoverAppearance()
+    }
+
+    private func updateHoverAppearance() {
+        for (pillView, pillTintLayer) in zip(pillViews, pillTintLayers) {
+            pillTintLayer.backgroundColor = highlightColor.nsColor.withAlphaComponent(isHovering ? 0.7 : 0.55).cgColor
+            pillView.layer?.borderColor = NSColor.white.withAlphaComponent(isHovering ? 0.25 : 0.15).cgColor
+        }
+        needsDisplay = true
+    }
 
     override func layout() {
         super.layout()
-        if let labelFrame {
-            pillView.frame = labelFrame
-        }
+        for index in pillViews.indices {
+            let pillView = pillViews[index]
+            pillView.frame = labelFrames[index]
 
-        // Ensure tint layer is added and sized to fill the effect view
-        if pillTintLayer.superlayer == nil {
-            if let effectView = pillView.subviews.first as? NSVisualEffectView {
+            // Ensure tint layer is added and sized to fill the effect view
+            let pillTintLayer = pillTintLayers[index]
+            if pillTintLayer.superlayer == nil, let effectView = pillView.subviews.first as? NSVisualEffectView {
                 effectView.layer?.addSublayer(pillTintLayer)
             }
+            pillTintLayer.frame = pillView.bounds
         }
-        pillTintLayer.frame = pillView.bounds
     }
 
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        for area in trackingAreas {
-            removeTrackingArea(area)
-        }
-        addTrackingArea(NSTrackingArea(
-            rect: bounds,
-            options: [.mouseEnteredAndExited, .activeAlways],
-            owner: self,
-            userInfo: nil
-        ))
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        isHovering = true
-        window?.backgroundColor = highlightColor.nsColor.withAlphaComponent(0.18)
-        if !pillView.isHidden {
-            pillTintLayer.backgroundColor = highlightColor.nsColor.withAlphaComponent(0.7).cgColor
-            pillView.layer?.borderColor = NSColor.white.withAlphaComponent(0.25).cgColor
-        }
-        needsDisplay = true
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        isHovering = false
-        window?.backgroundColor = highlightColor.nsColor.withAlphaComponent(0.08)
-        if !pillView.isHidden {
-            pillTintLayer.backgroundColor = highlightColor.nsColor.withAlphaComponent(0.55).cgColor
-            pillView.layer?.borderColor = NSColor.white.withAlphaComponent(0.15).cgColor
-        }
-        needsDisplay = true
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        containsTarget(at: point) ? self : nil
     }
 
     override func mouseDown(with event: NSEvent) {
+        guard containsTarget(at: event.locationInWindow) else { return }
         onClick?()
     }
 
     override func rightMouseDown(with event: NSEvent) {
+        guard containsTarget(at: event.locationInWindow) else { return }
         onRightClick?()
     }
 
     override func draw(_ dirtyRect: NSRect) {
+        let fillColor = highlightColor.nsColor.withAlphaComponent(isHovering ? 0.18 : 0.08)
         let borderColor = highlightColor.nsColor.withAlphaComponent(isHovering ? 0.6 : 0.3)
-        borderColor.setStroke()
-        let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), xRadius: 6, yRadius: 6)
-        path.lineWidth = 2
-        path.stroke()
+        for regionFrame in regionFrames {
+            let path = NSBezierPath(roundedRect: regionFrame.insetBy(dx: 1, dy: 1), xRadius: 6, yRadius: 6)
+            fillColor.setFill()
+            path.fill()
+            borderColor.setStroke()
+            path.lineWidth = 2
+            path.stroke()
+        }
+    }
+
+    private func containsTarget(at point: CGPoint) -> Bool {
+        labelFrames.contains { $0.contains(point) } || regionFrames.contains { $0.contains(point) }
     }
 }

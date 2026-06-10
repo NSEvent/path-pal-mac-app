@@ -28,6 +28,7 @@ final class OverlayWindowService {
     private var moveMonitor: Any?
     private var dialogFrameTimer: Timer?
     private var currentDialog: DialogInfo?
+    private var overlayRequestID = 0
     private var dialogBoundsCG: CGRect = .zero  // Dialog bounds in CG coords (top-left origin)
     private var finderWindows: [(name: String, path: String, bounds: CGRect)] = []
     private let appState: AppState
@@ -41,64 +42,56 @@ final class OverlayWindowService {
         // If an overlay is already showing or being created, don't create another one
         if overlayPanel != nil || isShowingOverlay { return }
         isShowingOverlay = true
-
         currentDialog = dialog
+        overlayRequestID += 1
+        let requestID = overlayRequestID
 
-        // Get Finder windows on a background thread to avoid blocking during modal dialogs
+        let panel = OverlayPanel()
+        panel.contentView = makeOverlayContent(finderWindows: appState.finderWindows, dialogType: dialog.type)
+        positionOverlay(panel, relativeTo: dialog)
+        panel.orderFrontRegardless()
+        overlayPanel = panel
+
+        // Start monitors immediately; Finder windows populate asynchronously.
+        startEventTap()
+        startMoveMonitor()
+        startDialogFrameMonitor()
+
+        debugLog("Overlay panel shown, isVisible=\(panel.isVisible), level=\(panel.level.rawValue), frame=\(panel.frame)")
+
+        // Get Finder windows on a background thread so the overlay appears immediately.
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let windows = FinderScriptingService.shared.getFinderWindowsWithBounds()
-            DispatchQueue.main.async {
-                guard let self = self, self.currentDialog != nil else { return }
-                self.finderWindows = windows
-                debugLog("Found \(windows.count) Finder windows (via AppleScript)")
-                for fw in windows {
-                    debugLog("  Window: \(fw.name) at (\(fw.bounds.origin.x),\(fw.bounds.origin.y),\(fw.bounds.width),\(fw.bounds.height)) path=\(fw.path)")
-                }
-
-                // Update appState for the sidebar list
-                self.appState.finderWindows = windows.enumerated().map { (i, fw) in
-                    FinderWindow(windowID: CGWindowID(i), title: fw.name, bounds: fw.bounds, path: fw.path)
-                }
-
-                // Create overlay panel near the dialog
-                let panel = OverlayPanel()
-                let sidebarWindows = self.appState.finderWindows
-                let contentView = OverlayPanelView(
-                    finderWindows: sidebarWindows,
-                    dialogType: dialog.type,
-                    onFolderSelected: { [weak self] path in
-                        self?.navigateDialog(toPath: path)
-                    },
-                    onDesktopSelected: { [weak self] in
-                        let desktop = FileManager.default.homeDirectoryForCurrentUser
-                            .appendingPathComponent("Desktop").path
-                        self?.navigateDialog(toPath: desktop)
-                    },
-                    onDismiss: { [weak self] in
-                        self?.hideOverlay()
-                    }
+            let windows = FinderScriptingService.shared.getFinderWindowsWithBounds().enumerated().map { index, window in
+                FinderWindow(
+                    windowID: CGWindowID(index),
+                    title: window.name,
+                    bounds: window.bounds,
+                    path: window.path
                 )
-                panel.contentView = NSHostingView(rootView: contentView)
-                self.positionOverlay(panel, relativeTo: dialog)
-                panel.orderFrontRegardless()
-                debugLog("Overlay panel shown, isVisible=\(panel.isVisible), level=\(panel.level.rawValue), frame=\(panel.frame)")
-                self.overlayPanel = panel
+            }
+            DispatchQueue.main.async {
+                guard let self = self,
+                      self.overlayRequestID == requestID,
+                      self.currentDialog != nil,
+                      let panel = self.overlayPanel else { return }
 
-                // Show highlight overlays on Finder windows
+                self.appState.finderWindows = windows
+                self.finderWindows = windows.map {
+                    (name: $0.title, path: $0.path, bounds: $0.bounds)
+                }
+                panel.contentView = self.makeOverlayContent(finderWindows: windows, dialogType: dialog.type)
+                debugLog("Found \(windows.count) Finder windows")
+
                 if SettingsService.shared.highlightFinderWindows {
                     self.showHighlightWindows()
                 }
-
-                // Start CGEvent tap for click interception + move monitor for tooltips
-                self.startEventTap()
-                self.startMoveMonitor()
-                self.startDialogFrameMonitor()
             }
         }
     }
 
     func hideOverlay() {
-        overlayPanel?.close()
+        overlayRequestID += 1
+        overlayPanel?.orderOut(nil)
         overlayPanel = nil
         isShowingOverlay = false
         hideHighlightWindows()
@@ -112,10 +105,29 @@ final class OverlayWindowService {
         finderWindows = []
     }
 
+    private func makeOverlayContent(finderWindows: [FinderWindow], dialogType: DialogType) -> NSView {
+        NSHostingView(rootView: OverlayPanelView(
+            finderWindows: finderWindows,
+            dialogType: dialogType,
+            onFolderSelected: { [weak self] path in
+                self?.navigateDialog(toPath: path)
+            },
+            onDesktopSelected: { [weak self] in
+                let desktop = FileManager.default.homeDirectoryForCurrentUser
+                    .appendingPathComponent("Desktop").path
+                self?.navigateDialog(toPath: desktop)
+            },
+            onDismiss: { [weak self] in
+                self?.hideOverlay()
+            }
+        ))
+    }
+
     // MARK: - Finder Window Highlights
 
     private func showHighlightWindows() {
-        hideHighlightWindows()
+        let oldHighlightWindows = highlightWindows
+        highlightWindows.removeAll(keepingCapacity: true)
 
         var excludeRects: [CGRect] = []
 
@@ -196,6 +208,8 @@ final class OverlayWindowService {
             highlightWindows.append(hw)
         }
 
+        oldHighlightWindows.forEach { $0.orderOut(nil) }
+
         // Re-activate the dialog's app so its window (with the Open/Save dialog)
         // comes back above the highlights. The sidebar panel at .screenSaver level
         // stays on top regardless.
@@ -274,16 +288,16 @@ final class OverlayWindowService {
     }
 
     private func dismissHighlightWindow(_ hw: HighlightWindow) {
-        hw.close()
+        hw.orderOut(nil)
         highlightWindows.removeAll { $0 === hw }
         hideTooltip()
     }
 
     private func hideHighlightWindows() {
         for hw in highlightWindows {
-            hw.close()
+            hw.orderOut(nil)
         }
-        highlightWindows.removeAll()
+        highlightWindows.removeAll(keepingCapacity: true)
     }
 
     private func navigateDialog(toPath path: String) {
@@ -538,7 +552,7 @@ final class OverlayWindowService {
     }
 
     private func hideTooltip() {
-        tooltipPanel?.close()
+        tooltipPanel?.orderOut(nil)
         tooltipPanel = nil
     }
 

@@ -102,7 +102,12 @@ struct OverlayPanelView: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .onAppear {
             recentFolders = RecentItemsService().recentFolders
-            finderFavorites = FinderFavoritesService.shared.getFavorites()
+            DispatchQueue.global(qos: .utility).async {
+                let favorites = FinderFavoritesService.shared.getFavorites()
+                DispatchQueue.main.async {
+                    finderFavorites = favorites
+                }
+            }
         }
     }
 

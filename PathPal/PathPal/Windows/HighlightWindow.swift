@@ -68,6 +68,7 @@ final class HighlightWindow: NSPanel {
         ignoresMouseEvents = false
         hasShadow = false
         hidesOnDeactivate = false
+        isReleasedWhenClosed = false
         collectionBehavior = [.canJoinAllSpaces, .stationary]
 
         // Show last 2 path components for context (e.g. "Projects/MyApp")

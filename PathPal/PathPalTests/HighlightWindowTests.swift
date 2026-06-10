@@ -160,7 +160,7 @@ final class HighlightWindowTests: XCTestCase {
 
     // MARK: - Label Layout
 
-    func testLabelLayoutAssignsOneLabelPerFinderWindow() {
+    func testLabelLayoutAssignsOneLabelPerVisibleRegion() {
         let regions = [
             HighlightLabelRegion(
                 windowIndex: 0,
@@ -178,8 +178,9 @@ final class HighlightWindowTests: XCTestCase {
 
         let assignments = HighlightLabelLayout.assignments(for: regions)
 
-        XCTAssertEqual(assignments.count, 1)
-        XCTAssertEqual(assignments.keys.first?.windowIndex, 0)
+        XCTAssertEqual(assignments.count, 2)
+        XCTAssertNotNil(assignments[regions[0].id])
+        XCTAssertNotNil(assignments[regions[1].id])
     }
 
     func testLabelLayoutAvoidsOverlappingLabels() {
@@ -216,5 +217,20 @@ final class HighlightWindowTests: XCTestCase {
         let frame = try XCTUnwrap(assignments[region.id])
 
         XCTAssertTrue(region.bounds.contains(frame))
+    }
+
+    func testLabelLayoutUsesCompactLabelForNarrowRegion() throws {
+        let region = HighlightLabelRegion(
+            windowIndex: 0,
+            regionIndex: 0,
+            bounds: CGRect(x: 20, y: 40, width: 62, height: 34),
+            path: "/Users/kevin/Downloads"
+        )
+
+        let assignments = HighlightLabelLayout.assignments(for: [region])
+        let frame = try XCTUnwrap(assignments[region.id])
+
+        XCTAssertTrue(region.bounds.contains(frame))
+        XCTAssertLessThanOrEqual(frame.width, region.bounds.width)
     }
 }

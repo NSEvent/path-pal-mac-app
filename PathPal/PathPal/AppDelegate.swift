@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var menuBarService: MenuBarService!
     private let recentItemsService = RecentItemsService()
     private let accessibilityService = AccessibilityService()
+    private let hotKeyService = HotKeyService()
     private var overlayWindowService: OverlayWindowService!
     private var pathBarPanel: PathBarPanel?
     private var finderPollingTimer: Timer?
@@ -87,6 +88,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             forEventClass: AEEventClass(kInternetEventClass),
             andEventID: AEEventID(kAEGetURL)
         )
+
+        hotKeyService.register { [weak self] in
+            guard SettingsService.shared.pathBarHotKeyEnabled else { return }
+            self?.showPathBar()
+        }
 
         // Update recent items from Finder
         updateRecentFromFinder()
@@ -268,8 +274,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         accessibilityService.stop()
+        hotKeyService.unregister()
         finderPollingTimer?.invalidate()
         recentItemsService.save()
     }
 }
-

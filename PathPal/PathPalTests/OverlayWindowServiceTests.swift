@@ -370,4 +370,25 @@ final class OverlayWindowServiceTests: XCTestCase {
         XCTAssertFalse(downloadsRegions.isEmpty,
             "Should have visible highlights for Finder windows extending outside Chrome")
     }
+
+    func testDialogFrameNeedsRefreshForResize() {
+        let previous = CGRect(x: 100, y: 100, width: 800, height: 600)
+        let resized = CGRect(x: 100, y: 100, width: 900, height: 640)
+
+        XCTAssertTrue(OverlayWindowService.dialogFrameNeedsRefresh(previous: previous, current: resized))
+    }
+
+    func testDialogFrameNeedsRefreshForMove() {
+        let previous = CGRect(x: 100, y: 100, width: 800, height: 600)
+        let moved = CGRect(x: 140, y: 120, width: 800, height: 600)
+
+        XCTAssertTrue(OverlayWindowService.dialogFrameNeedsRefresh(previous: previous, current: moved))
+    }
+
+    func testDialogFrameIgnoresSubpixelNoise() {
+        let previous = CGRect(x: 100, y: 100, width: 800, height: 600)
+        let noisy = CGRect(x: 100.25, y: 99.8, width: 800.5, height: 599.6)
+
+        XCTAssertFalse(OverlayWindowService.dialogFrameNeedsRefresh(previous: previous, current: noisy))
+    }
 }

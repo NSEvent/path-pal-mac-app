@@ -24,7 +24,9 @@ final class OverlayWindowService {
     private var highlightWindows: [HighlightWindow] = []
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
+    private var clickMonitor: Any?
     private var moveMonitor: Any?
+    private var dialogFrameTimer: Timer?
     private var currentDialog: DialogInfo?
     private var dialogBoundsCG: CGRect = .zero  // Dialog bounds in CG coords (top-left origin)
     private var finderWindows: [(name: String, path: String, bounds: CGRect)] = []
@@ -90,6 +92,7 @@ final class OverlayWindowService {
                 // Start CGEvent tap for click interception + move monitor for tooltips
                 self.startEventTap()
                 self.startMoveMonitor()
+                self.startDialogFrameMonitor()
             }
         }
     }
@@ -100,7 +103,9 @@ final class OverlayWindowService {
         isShowingOverlay = false
         hideHighlightWindows()
         stopEventTap()
+        stopClickMonitorFallback()
         stopMoveMonitor()
+        stopDialogFrameMonitor()
         hideTooltip()
         currentDialog = nil
         dialogBoundsCG = .zero
@@ -136,13 +141,17 @@ final class OverlayWindowService {
             excludeRects.append(panelCG.insetBy(dx: -12, dy: -12))
         }
 
+        let clickEnabled = SettingsService.shared.clickFinderWindowToChoose
+
         for (colorIndex, fw) in appState.finderWindows.enumerated() {
             let visibleRegions = subtractRects(from: fw.bounds, excluding: excludeRects)
             for region in visibleRegions {
                 let clippedFW = FinderWindow(windowID: fw.windowID, title: fw.title, bounds: region, path: fw.path)
                 let hw = HighlightWindow(finderWindow: clippedFW, colorIndex: colorIndex)
+                hw.ignoresMouseEvents = !clickEnabled
                 hw.onClick = { [weak self] in
                     guard let self = self else { return }
+                    guard SettingsService.shared.clickFinderWindowToChoose else { return }
                     let mouseLocation = NSEvent.mouseLocation
                     guard let screen = NSScreen.main else { return }
                     let cgY = screen.frame.height - mouseLocation.y
@@ -269,6 +278,12 @@ final class OverlayWindowService {
 
     private func startEventTap() {
         stopEventTap()
+        stopClickMonitorFallback()
+
+        guard SettingsService.shared.clickFinderWindowToChoose else {
+            debugLog("[PathPal] Finder window click-to-choose disabled")
+            return
+        }
 
         let eventMask: CGEventMask = (1 << CGEventType.leftMouseDown.rawValue)
 
@@ -304,8 +319,9 @@ final class OverlayWindowService {
     }
 
     private func startClickMonitorFallback() {
+        stopClickMonitorFallback()
         debugLog("[PathPal] Using NSEvent global monitor fallback for clicks")
-        moveMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+        clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
             guard let self = self else { return }
             let mouseLocation = NSEvent.mouseLocation
             guard let screen = NSScreen.main else { return }
@@ -323,6 +339,7 @@ final class OverlayWindowService {
 
     private func checkClickOnFinderWindow(at cgPoint: CGPoint) {
         guard currentDialog != nil else { return }
+        guard SettingsService.shared.clickFinderWindowToChoose else { return }
         guard let screen = NSScreen.main else { return }
 
         // Don't intercept clicks on the overlay panel
@@ -359,10 +376,21 @@ final class OverlayWindowService {
         }
     }
 
+    private func stopClickMonitorFallback() {
+        if let monitor = clickMonitor {
+            NSEvent.removeMonitor(monitor)
+            clickMonitor = nil
+        }
+    }
+
     // MARK: - Move Monitor (tooltip on hover)
 
     private func startMoveMonitor() {
         stopMoveMonitor()
+        guard SettingsService.shared.showFinderWindowNames else {
+            hideTooltip()
+            return
+        }
         moveMonitor = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
             self?.handleGlobalMove()
         }
@@ -372,6 +400,10 @@ final class OverlayWindowService {
 
     private func handleGlobalMove() {
         guard currentDialog != nil, !finderWindows.isEmpty else { return }
+        guard SettingsService.shared.showFinderWindowNames else {
+            hideTooltip()
+            return
+        }
 
         let mouseLocation = NSEvent.mouseLocation
         guard let screen = NSScreen.main else { return }
@@ -493,39 +525,103 @@ final class OverlayWindowService {
         tooltipPanel = nil
     }
 
+    // MARK: - Dialog Frame Monitoring
+
+    private func startDialogFrameMonitor() {
+        stopDialogFrameMonitor()
+        guard currentDialog != nil else { return }
+
+        let timer = Timer(timeInterval: 0.12, repeats: true) { [weak self] _ in
+            self?.refreshDialogFrameIfNeeded()
+        }
+        timer.tolerance = 0.04
+        RunLoop.main.add(timer, forMode: .common)
+        dialogFrameTimer = timer
+    }
+
+    private func stopDialogFrameMonitor() {
+        dialogFrameTimer?.invalidate()
+        dialogFrameTimer = nil
+    }
+
+    private func refreshDialogFrameIfNeeded() {
+        guard let dialog = currentDialog,
+              let newBounds = Self.dialogBounds(for: dialog.element),
+              Self.dialogFrameNeedsRefresh(previous: dialogBoundsCG, current: newBounds) else {
+            return
+        }
+
+        debugLog("Dialog frame changed: \(dialogBoundsCG) -> \(newBounds)")
+        dialogBoundsCG = newBounds
+
+        if let panel = overlayPanel {
+            positionOverlay(panel, dialogBounds: newBounds)
+        }
+
+        if SettingsService.shared.highlightFinderWindows {
+            showHighlightWindows()
+        }
+    }
+
+    static func dialogFrameNeedsRefresh(previous: CGRect, current: CGRect, tolerance: CGFloat = 1.0) -> Bool {
+        guard !previous.isEmpty else { return !current.isEmpty }
+        return abs(previous.origin.x - current.origin.x) > tolerance
+            || abs(previous.origin.y - current.origin.y) > tolerance
+            || abs(previous.width - current.width) > tolerance
+            || abs(previous.height - current.height) > tolerance
+    }
+
+    static func dialogBounds(for element: AXUIElement) -> CGRect? {
+        var positionValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &positionValue) == .success,
+              let rawPosition = positionValue,
+              CFGetTypeID(rawPosition) == AXValueGetTypeID() else {
+            return nil
+        }
+        let position = rawPosition as! AXValue
+        guard AXValueGetType(position) == .cgPoint else { return nil }
+
+        var sizeValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeValue) == .success,
+              let rawSize = sizeValue,
+              CFGetTypeID(rawSize) == AXValueGetTypeID() else {
+            return nil
+        }
+        let size = rawSize as! AXValue
+        guard AXValueGetType(size) == .cgSize else { return nil }
+
+        var origin = CGPoint.zero
+        var boundsSize = CGSize.zero
+        guard AXValueGetValue(position, .cgPoint, &origin),
+              AXValueGetValue(size, .cgSize, &boundsSize),
+              boundsSize.width > 0,
+              boundsSize.height > 0 else {
+            return nil
+        }
+
+        return CGRect(origin: origin, size: boundsSize)
+    }
+
     // MARK: - Overlay Positioning
 
     private func positionOverlay(_ panel: OverlayPanel, relativeTo dialog: DialogInfo) {
-        var positionValue: CFTypeRef?
-        let posResult = AXUIElementCopyAttributeValue(dialog.element, kAXPositionAttribute as CFString, &positionValue)
+        let fallbackBounds = CGRect(origin: .zero, size: CGSize(width: 500, height: 400))
+        positionOverlay(panel, dialogBounds: Self.dialogBounds(for: dialog.element) ?? fallbackBounds)
+    }
 
-        var sizeValue: CFTypeRef?
-        let sizeResult = AXUIElementCopyAttributeValue(dialog.element, kAXSizeAttribute as CFString, &sizeValue)
-
-        debugLog("positionOverlay: posResult=\(posResult.rawValue) sizeResult=\(sizeResult.rawValue)")
-
-        var dialogOrigin = CGPoint.zero
-        var dialogSize = CGSize(width: 500, height: 400)
-
-        if let positionValue = positionValue {
-            AXValueGetValue(positionValue as! AXValue, .cgPoint, &dialogOrigin)
-        }
-        if let sizeValue = sizeValue {
-            AXValueGetValue(sizeValue as! AXValue, .cgSize, &dialogSize)
-        }
-
-        debugLog("positionOverlay: dialog at (\(dialogOrigin.x), \(dialogOrigin.y)) size (\(dialogSize.width) x \(dialogSize.height))")
+    private func positionOverlay(_ panel: OverlayPanel, dialogBounds: CGRect) {
+        debugLog("positionOverlay: dialog at (\(dialogBounds.origin.x), \(dialogBounds.origin.y)) size (\(dialogBounds.width) x \(dialogBounds.height))")
 
         // Store dialog bounds in CG coords (top-left origin) for highlight clipping
-        dialogBoundsCG = CGRect(origin: dialogOrigin, size: dialogSize)
+        dialogBoundsCG = dialogBounds
 
         let panelWidth: CGFloat = 260
         let panelHeight: CGFloat = 400
-        var x = dialogOrigin.x - panelWidth - 10
-        let y = dialogOrigin.y
+        var x = dialogBounds.origin.x - panelWidth - 10
+        let y = dialogBounds.origin.y
 
         if x < 0 {
-            x = dialogOrigin.x + dialogSize.width + 10
+            x = dialogBounds.origin.x + dialogBounds.width + 10
         }
 
         if let screen = NSScreen.main {

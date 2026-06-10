@@ -6,8 +6,10 @@ final class HotKeyService {
     private var onHotKey: (() -> Void)?
 
     private static func debugLog(_ message: String) {
-        let url = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/PathPal/debug.log")
+        let dir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/PathPal")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("debug.log")
         let timestamp = ISO8601DateFormatter().string(from: Date())
         let line = "[\(timestamp)] \(message)\n"
         if let handle = try? FileHandle(forWritingTo: url) {
@@ -21,6 +23,7 @@ final class HotKeyService {
 
     /// Register Cmd+L as a hotkey that only fires when Finder is frontmost.
     func register(onHotKey: @escaping () -> Void) {
+        unregister()
         self.onHotKey = onHotKey
 
         HotKeyService.debugLog("Registering Cmd+L via NSEvent global monitor")

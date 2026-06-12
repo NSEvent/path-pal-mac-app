@@ -145,9 +145,9 @@ struct PathBarView: View {
         .frame(minWidth: 400, maxWidth: .infinity)
         .frame(maxHeight: 400)
         .fixedSize(horizontal: false, vertical: true)
-        .background(.ultraThinMaterial)
+        .background(.ultraThinMaterial.opacity(0.45))
         .clipShape(RoundedRectangle(cornerRadius: 10))
-        .shadow(color: .black.opacity(0.3), radius: 20)
+        .shadow(color: .black.opacity(0.2), radius: 14)
         // The panel is taller than the card so the completion list has room
         // to drop down; pin the card to the top and let clicks on the
         // transparent remainder dismiss, like clicking outside.

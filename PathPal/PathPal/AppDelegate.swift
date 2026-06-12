@@ -40,8 +40,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             showOnboarding()
         }
 
-        // Prompt for Full Disk Access if not yet granted (needed for Finder favorites)
-        if !PermissionsService.shared.isFullDiskAccessGranted {
+        // Prompt for Full Disk Access if not yet granted (needed for Finder
+        // favorites). FDA is optional, so nag at most once — after that it's
+        // discoverable in onboarding and Settings.
+        let fdaPromptKey = "hasPromptedFullDiskAccess"
+        if !PermissionsService.shared.isFullDiskAccessGranted,
+           !UserDefaults.standard.bool(forKey: fdaPromptKey) {
+            UserDefaults.standard.set(true, forKey: fdaPromptKey)
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 PermissionsService.shared.requestFullDiskAccess()
             }

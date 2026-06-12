@@ -142,12 +142,21 @@ struct PathBarView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
         }
-        .frame(width: 500)
+        .frame(minWidth: 400, maxWidth: .infinity)
         .frame(maxHeight: 400)
         .fixedSize(horizontal: false, vertical: true)
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .shadow(color: .black.opacity(0.3), radius: 20)
+        // The panel is taller than the card so the completion list has room
+        // to drop down; pin the card to the top and let clicks on the
+        // transparent remainder dismiss, like clicking outside.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { onDismiss() }
+        }
         .onAppear {
             updateCompletions(for: inputText)
             // The seed comes from the polled cache, which can lag behind the

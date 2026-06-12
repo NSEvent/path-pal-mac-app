@@ -3,11 +3,8 @@ import AppKit
 import ApplicationServices
 
 final class PathBarService {
-    /// Front Finder window's folder, read synchronously via Accessibility.
-    /// ~1 ms vs ~200 ms for the AppleScript round-trip, so the path bar can
-    /// seed its field before first render. Returns nil for windows without
-    /// an AXDocument (e.g. Recents), where the AppleScript fallback applies.
-    static func frontFinderWindowPathViaAX() -> String? {
+    /// Finder's front window as an AXUIElement (focused, falling back to main).
+    private static func frontFinderAXWindow() -> AXUIElement? {
         guard let finder = NSRunningApplication
             .runningApplications(withBundleIdentifier: "com.apple.finder").first else { return nil }
         let app = AXUIElementCreateApplication(finder.processIdentifier)
@@ -17,14 +14,42 @@ final class PathBarService {
             AXUIElementCopyAttributeValue(app, kAXMainWindowAttribute as CFString, &windowRef)
         }
         guard let windowRef, CFGetTypeID(windowRef) == AXUIElementGetTypeID() else { return nil }
-        let window = windowRef as! AXUIElement
+        return (windowRef as! AXUIElement)
+    }
 
+    /// Front Finder window's folder, read synchronously via Accessibility.
+    /// ~1 ms vs ~200 ms for the AppleScript round-trip, so the path bar can
+    /// seed its field before first render. Returns nil for windows without
+    /// an AXDocument (e.g. Recents), where the AppleScript fallback applies.
+    static func frontFinderWindowPathViaAX() -> String? {
+        guard let window = frontFinderAXWindow() else { return nil }
         var docRef: CFTypeRef?
         AXUIElementCopyAttributeValue(window, kAXDocumentAttribute as CFString, &docRef)
         guard let doc = docRef as? String else { return nil }
         if let url = URL(string: doc), url.isFileURL { return url.path }
         if doc.hasPrefix("/") { return doc }
         return nil
+    }
+
+    /// Front Finder window's frame in Cocoa (bottom-left origin) coordinates.
+    static func frontFinderWindowFrame() -> NSRect? {
+        guard let window = frontFinderAXWindow() else { return nil }
+        var posRef: CFTypeRef?
+        var sizeRef: CFTypeRef?
+        AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &posRef)
+        AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &sizeRef)
+        var position = CGPoint.zero
+        var size = CGSize.zero
+        guard let posRef, CFGetTypeID(posRef) == AXValueGetTypeID(),
+              AXValueGetValue((posRef as! AXValue), .cgPoint, &position),
+              let sizeRef, CFGetTypeID(sizeRef) == AXValueGetTypeID(),
+              AXValueGetValue((sizeRef as! AXValue), .cgSize, &size),
+              size.width > 0 else { return nil }
+        // AX reports top-left-origin global coordinates; Cocoa wants
+        // bottom-left relative to the primary screen.
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+        return NSRect(x: position.x, y: primaryHeight - position.y - size.height,
+                      width: size.width, height: size.height)
     }
 
     /// Returns autocomplete suggestions for a partial path.

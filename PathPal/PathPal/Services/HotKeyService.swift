@@ -58,6 +58,14 @@ final class HotKeyService {
                 self?.armHotKey()
             } else {
                 self?.disarmHotKey()
+                // Transient activations (open(1), our own panels) can bounce
+                // focus straight back to Finder without a fresh didActivate
+                // event — re-check shortly so the hotkey doesn't stay dead.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    if NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.apple.finder" {
+                        self?.armHotKey()
+                    }
+                }
             }
         })
 

@@ -51,15 +51,29 @@ final class PathBarPanel: NSPanel {
         onLostFocus?()
     }
 
-    /// Position the panel centered near the top of the screen.
-    func positionAboveFinderWindow() {
-        guard let screen = NSScreen.main else { return }
-
-        let panelWidth: CGFloat = 500
+    /// Match the front Finder window's width and sit just above its top edge;
+    /// the completion list drops down over the window like an omnibox.
+    /// Falls back to centered-near-the-top when no Finder window frame is known.
+    func position(above finderFrame: NSRect?) {
         let panelHeight: CGFloat = 400
+        // Height of the input bar at the top of the (otherwise transparent)
+        // panel — its bottom edge should clear the Finder window's top.
+        let barHeight: CGFloat = 52
+
+        if let finderFrame,
+           let screen = NSScreen.screens.first(where: { $0.frame.intersects(finderFrame) }) ?? NSScreen.main {
+            let visible = screen.visibleFrame
+            let width = max(400, min(finderFrame.width, visible.width))
+            let x = max(visible.minX, min(finderFrame.minX, visible.maxX - width))
+            let top = min(finderFrame.maxY + barHeight + 8, visible.maxY)
+            setFrame(NSRect(x: x, y: top - panelHeight, width: width, height: panelHeight), display: true)
+            return
+        }
+
+        guard let screen = NSScreen.main else { return }
+        let panelWidth: CGFloat = 500
         let x = screen.frame.origin.x + (screen.frame.width - panelWidth) / 2
         let y = screen.frame.origin.y + screen.frame.height - panelHeight - 100
-
         setFrame(NSRect(x: x, y: y, width: panelWidth, height: panelHeight), display: true)
     }
 }

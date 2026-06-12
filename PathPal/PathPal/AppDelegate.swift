@@ -187,7 +187,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             self?.pathBarPanel?.close()
             self?.pathBarPanel = nil
         }
-        panel.positionAboveFinderWindow()
+        panel.position(above: PathBarService.frontFinderWindowFrame())
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
         pathBarPanel = panel

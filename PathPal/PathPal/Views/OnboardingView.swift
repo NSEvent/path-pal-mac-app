@@ -6,24 +6,20 @@ struct OnboardingView: View {
     @State private var isFullDiskAccessGranted = PermissionsService.shared.isFullDiskAccessGranted
     @State private var iconScale: CGFloat = 0.8
     @State private var iconOpacity: Double = 0.0
+    @State private var pollTimer: Timer?
+    @State private var automationCheckInFlight = false
     let onComplete: () -> Void
 
-    private var grantedCount: Int {
-        [isAccessibilityGranted, isAutomationGranted, isFullDiskAccessGranted].filter { $0 }.count
+    private var requiredGrantedCount: Int {
+        [isAccessibilityGranted, isAutomationGranted].filter { $0 }.count
     }
 
     var body: some View {
         VStack(spacing: 28) {
             // App icon with entrance animation
-            Image(systemName: "folder.badge.gearshape")
-                .font(.system(size: 56, weight: .thin))
-                .foregroundStyle(
-                    .linearGradient(
-                        colors: [.blue, .purple],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 88, height: 88)
                 .shadow(color: .blue.opacity(0.25), radius: 12, y: 4)
                 .scaleEffect(iconScale)
                 .opacity(iconOpacity)
@@ -48,11 +44,13 @@ struct OnboardingView: View {
                     .lineSpacing(2)
             }
 
-            // Step counter
-            Text("Step \(min(grantedCount + 1, 3)) of 3")
+            // Progress over the two required permissions
+            Text(requiredGrantedCount == 2
+                 ? "All set — Full Disk Access is optional"
+                 : "\(requiredGrantedCount) of 2 required permissions granted")
                 .font(.subheadline)
                 .fontWeight(.medium)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(requiredGrantedCount == 2 ? .green : .secondary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 4)
                 .background(
@@ -68,17 +66,8 @@ struct OnboardingView: View {
                     description: "Detect Open/Save dialogs and navigate them",
                     isGranted: isAccessibilityGranted,
                     isLast: false,
-                    action: {
-                        PermissionsService.shared.requestAccessibility()
-                        Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
-                            if PermissionsService.shared.isAccessibilityGranted {
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                                    isAccessibilityGranted = true
-                                }
-                                timer.invalidate()
-                            }
-                        }
-                    }
+                    action: { PermissionsService.shared.requestAccessibility() },
+                    settingsAction: { PermissionsService.shared.openAccessibilityPreferences() }
                 )
 
                 permissionStep(
@@ -87,23 +76,8 @@ struct OnboardingView: View {
                     description: "Read Finder window paths and navigate",
                     isGranted: isAutomationGranted,
                     isLast: false,
-                    action: {
-                        let granted = PermissionsService.shared.requestAndCheckAutomationPermission()
-                        if granted {
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                                isAutomationGranted = true
-                            }
-                        } else {
-                            Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
-                                if PermissionsService.shared.requestAndCheckAutomationPermission() {
-                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                                        isAutomationGranted = true
-                                    }
-                                    timer.invalidate()
-                                }
-                            }
-                        }
-                    }
+                    action: { checkAutomation() },
+                    settingsAction: { PermissionsService.shared.openAutomationPreferences() }
                 )
 
                 permissionStep(
@@ -112,17 +86,8 @@ struct OnboardingView: View {
                     description: "Optional — read Finder sidebar favorites",
                     isGranted: isFullDiskAccessGranted,
                     isLast: true,
-                    action: {
-                        PermissionsService.shared.openFullDiskAccessPreferences()
-                        Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { timer in
-                            if PermissionsService.shared.isFullDiskAccessGranted {
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                                    isFullDiskAccessGranted = true
-                                }
-                                timer.invalidate()
-                            }
-                        }
-                    }
+                    action: { PermissionsService.shared.openFullDiskAccessPreferences() },
+                    settingsAction: nil
                 )
             }
             .padding(20)
@@ -148,9 +113,55 @@ struct OnboardingView: View {
             .disabled(!isAccessibilityGranted)
         }
         .padding(40)
-        .frame(width: 500, height: 560)
+        .frame(width: 500, height: 580)
         .onAppear {
-            isAutomationGranted = PermissionsService.shared.requestAndCheckAutomationPermission()
+            checkAutomation()
+            startPolling()
+        }
+        .onDisappear {
+            pollTimer?.invalidate()
+            pollTimer = nil
+        }
+    }
+
+    /// Re-check all permissions once a second so the UI recovers on its own
+    /// when the user denies a prompt and later grants access in System Settings.
+    private func startPolling() {
+        pollTimer?.invalidate()
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+            let accessibility = PermissionsService.shared.isAccessibilityGranted
+            let fullDisk = PermissionsService.shared.isFullDiskAccessGranted
+            DispatchQueue.main.async {
+                if accessibility != isAccessibilityGranted {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                        isAccessibilityGranted = accessibility
+                    }
+                }
+                if fullDisk != isFullDiskAccessGranted {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                        isFullDiskAccessGranted = fullDisk
+                    }
+                    if fullDisk {
+                        FinderFavoritesService.shared.refresh()
+                    }
+                }
+            }
+            if !isAutomationGranted {
+                checkAutomation()
+            }
+        }
+    }
+
+    private func checkAutomation() {
+        guard !automationCheckInFlight else { return }
+        automationCheckInFlight = true
+        PermissionsService.shared.checkAutomationPermission { granted in
+            automationCheckInFlight = false
+            if granted != isAutomationGranted {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                    isAutomationGranted = granted
+                }
+            }
         }
     }
 
@@ -162,7 +173,8 @@ struct OnboardingView: View {
         description: String,
         isGranted: Bool,
         isLast: Bool,
-        action: @escaping () -> Void
+        action: @escaping () -> Void,
+        settingsAction: (() -> Void)?
     ) -> some View {
         HStack(alignment: .top, spacing: 14) {
             // Timeline indicator
@@ -213,6 +225,14 @@ struct OnboardingView: View {
                 Text(description)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                // Escape hatch if the system prompt was denied — TCC won't re-prompt,
+                // so the only path forward is flipping the toggle in System Settings.
+                if !isGranted, let settingsAction {
+                    Button("Denied the prompt? Open System Settings…") { settingsAction() }
+                        .buttonStyle(.link)
+                        .font(.caption)
+                }
             }
             .padding(.bottom, isLast ? 0 : 16)
         }

@@ -14,18 +14,31 @@ final class PermissionsService {
         _ = AXIsProcessTrustedWithOptions(options)
     }
 
-    /// Trigger Automation permission prompt by sending an AppleEvent to Finder.
-    /// Returns true if permission is granted.
-    func requestAndCheckAutomationPermission() -> Bool {
-        // Use a simple command that works even with no Finder windows
-        let script = NSAppleScript(source: "tell application \"Finder\" to return name")
-        var error: NSDictionary?
-        script?.executeAndReturnError(&error)
-        if let error = error, let errorNumber = error[NSAppleScript.errorNumber] as? Int {
-            // -1743 = permission denied, -600 = app not running (not a permission issue)
-            return errorNumber != -1743
+    /// Trigger the Automation permission prompt by sending an AppleEvent to Finder.
+    /// Runs osascript as a subprocess off the main thread so a slow or hung Finder
+    /// can't freeze the UI; the result is delivered on the main queue.
+    func checkAutomationPermission(completion: @escaping (Bool) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+            // Use a simple command that works even with no Finder windows
+            process.arguments = ["-e", "tell application \"Finder\" to return name"]
+            process.standardOutput = FileHandle.nullDevice
+            let errPipe = Pipe()
+            process.standardError = errPipe
+            var granted = true
+            do {
+                try process.run()
+                process.waitUntilExit()
+                let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+                let errText = String(data: errData, encoding: .utf8) ?? ""
+                // -1743 = permission denied; other errors (e.g. -600) aren't permission issues
+                granted = !errText.contains("-1743")
+            } catch {
+                granted = false
+            }
+            DispatchQueue.main.async { completion(granted) }
         }
-        return true
     }
 
     /// Check if Full Disk Access is granted by trying to read a TCC-protected file.
@@ -56,6 +69,13 @@ final class PermissionsService {
     /// Open Accessibility preferences pane.
     func openAccessibilityPreferences() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    /// Open Automation preferences pane.
+    func openAutomationPreferences() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") {
             NSWorkspace.shared.open(url)
         }
     }

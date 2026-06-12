@@ -4,6 +4,13 @@ struct SettingsView: View {
     @State private var settings = SettingsService.shared
     @State private var launchAtLogin = LaunchAtLoginService.shared.isEnabled
     @State private var isAccessibilityGranted = PermissionsService.shared.isAccessibilityGranted
+    @State private var isAutomationGranted = false
+    @State private var isFullDiskAccessGranted = PermissionsService.shared.isFullDiskAccessGranted
+    @State private var permissionsTimer: Timer?
+
+    private var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+    }
 
     var body: some View {
         ScrollView {
@@ -79,37 +86,27 @@ struct SettingsView: View {
                 }
 
                 settingsCard(icon: "lock.shield", iconColor: .green, title: "Permissions") {
-                    HStack(spacing: 10) {
-                        Text("Accessibility")
-                            .font(.body)
-                        Spacer()
-                        if isAccessibilityGranted {
-                            HStack(spacing: 6) {
-                                Circle()
-                                    .fill(.green)
-                                    .frame(width: 8, height: 8)
-                                    .shadow(color: .green.opacity(0.5), radius: 3)
-                                Text("Active")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                    .foregroundStyle(.green)
-                            }
-                        } else {
-                            Button("Grant Access") {
-                                PermissionsService.shared.requestAccessibility()
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
+                    VStack(spacing: 12) {
+                        permissionRow("Accessibility", isGranted: isAccessibilityGranted) {
+                            PermissionsService.shared.requestAccessibility()
+                            PermissionsService.shared.openAccessibilityPreferences()
+                        }
+                        permissionRow("Automation (Finder)", isGranted: isAutomationGranted) {
+                            refreshAutomationStatus()
+                            PermissionsService.shared.openAutomationPreferences()
+                        }
+                        permissionRow("Full Disk Access", detail: "Optional", isGranted: isFullDiskAccessGranted) {
+                            PermissionsService.shared.openFullDiskAccessPreferences()
                         }
                     }
                 }
 
                 // App identity footer
                 HStack(spacing: 6) {
-                    Image(systemName: "folder.badge.gearshape")
-                        .foregroundStyle(.tertiary)
-                        .font(.subheadline)
-                    Text("PathPal")
+                    Image(nsImage: NSApp.applicationIconImage)
+                        .resizable()
+                        .frame(width: 16, height: 16)
+                    Text("PathPal \(appVersion)")
                         .font(.subheadline)
                         .foregroundStyle(.tertiary)
                 }
@@ -120,7 +117,62 @@ struct SettingsView: View {
         }
         .frame(width: 480, height: 540)
         .onAppear {
-            isAccessibilityGranted = PermissionsService.shared.isAccessibilityGranted
+            refreshPermissionStatuses()
+            permissionsTimer?.invalidate()
+            permissionsTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in
+                refreshPermissionStatuses()
+            }
+        }
+        .onDisappear {
+            permissionsTimer?.invalidate()
+            permissionsTimer = nil
+        }
+    }
+
+    private func refreshPermissionStatuses() {
+        isAccessibilityGranted = PermissionsService.shared.isAccessibilityGranted
+        let fullDisk = PermissionsService.shared.isFullDiskAccessGranted
+        if fullDisk != isFullDiskAccessGranted {
+            isFullDiskAccessGranted = fullDisk
+            if fullDisk {
+                FinderFavoritesService.shared.refresh()
+            }
+        }
+        refreshAutomationStatus()
+    }
+
+    private func refreshAutomationStatus() {
+        PermissionsService.shared.checkAutomationPermission { granted in
+            isAutomationGranted = granted
+        }
+    }
+
+    private func permissionRow(_ name: String, detail: String? = nil, isGranted: Bool, grantAction: @escaping () -> Void) -> some View {
+        HStack(spacing: 10) {
+            Text(name)
+                .font(.body)
+            if let detail {
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            Spacer()
+            if isGranted {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(.green)
+                        .frame(width: 8, height: 8)
+                        .shadow(color: .green.opacity(0.5), radius: 3)
+                    Text("Active")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.green)
+                }
+            } else {
+                Button("Grant Access") { grantAction() }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+            }
         }
     }
 

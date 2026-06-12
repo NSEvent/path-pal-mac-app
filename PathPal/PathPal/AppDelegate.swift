@@ -17,6 +17,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // Menu bar only — no dock icon
         NSApp.setActivationPolicy(.accessory)
 
+        // Drop recents whose folders/files no longer exist
+        recentItemsService.removeDeletedItems()
+
         // Set up menu bar
         menuBarService = MenuBarService(appState: appState, recentItemsService: recentItemsService)
         menuBarService.setup(
@@ -194,10 +197,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 end tell
             end tell
             """
-            if let appleScript = NSAppleScript(source: script) {
-                var error: NSDictionary?
-                appleScript.executeAndReturnError(&error)
-            }
+            FinderScriptingService.shared.runAsync(script)
         }
     }
 
@@ -252,7 +252,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func showOnboarding() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: 500),
+            contentRect: NSRect(x: 0, y: 0, width: 500, height: 580),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false

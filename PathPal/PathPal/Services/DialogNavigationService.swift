@@ -20,8 +20,9 @@ final class DialogNavigationService {
 
         // Snapshot the currently focused element before triggering Go to Folder
         let systemWide = AXUIElementCreateSystemWide()
-        var preFocused: CFTypeRef?
-        AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &preFocused)
+        var preFocusedRef: CFTypeRef?
+        AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &preFocusedRef)
+        let preFocused = Self.asAXUIElement(preFocusedRef)
 
         // Wait for app to become active, then send Cmd+Shift+G
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
@@ -33,7 +34,7 @@ final class DialogNavigationService {
             self.pollForGoToFolderField(
                 pid: pid,
                 path: path,
-                preFocused: preFocused as! AXUIElement?,
+                preFocused: preFocused,
                 attempt: 0
             )
         }
@@ -52,8 +53,7 @@ final class DialogNavigationService {
         var focusedRef: CFTypeRef?
         AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef)
 
-        if let focused = focusedRef {
-            let focusedElement = focused as! AXUIElement
+        if let focusedElement = Self.asAXUIElement(focusedRef) {
 
             // Check if the focused element is a text field or combo box (the Go to Folder input)
             var role: CFTypeRef?
@@ -82,10 +82,11 @@ final class DialogNavigationService {
                     // Fallback: type the path character by character via CGEvent
                     NSLog("[PathPal] AXSetValue failed, falling back to keystroke typing")
                     Self.postKey(code: 0, flags: [.maskCommand]) // Cmd+A to select all first
-                    usleep(50_000)
-                    Self.typeString(path)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                        Self.postKey(code: 36, flags: []) // Return
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        Self.typeString(path)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            Self.postKey(code: 36, flags: []) // Return
+                        }
                     }
                 }
                 return
@@ -96,6 +97,12 @@ final class DialogNavigationService {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             self?.pollForGoToFolderField(pid: pid, path: path, preFocused: preFocused, attempt: attempt + 1)
         }
+    }
+
+    /// Type-checked conversion from a CFTypeRef attribute value to AXUIElement.
+    private static func asAXUIElement(_ value: CFTypeRef?) -> AXUIElement? {
+        guard let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
+        return (value as! AXUIElement)
     }
 
     /// Post a key event to the currently active application via HID event tap.

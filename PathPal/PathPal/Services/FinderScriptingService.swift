@@ -91,6 +91,14 @@ final class FinderScriptingService {
         _ = runAppleScript(script)
     }
 
+    /// Run an arbitrary AppleScript on a background queue, discarding the result.
+    /// For fire-and-forget scripting (e.g. opening a path in iTerm) from UI code.
+    func runAsync(_ source: String) {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            _ = self?.runAppleScript(source)
+        }
+    }
+
     private func runAppleScript(_ source: String) -> String? {
         // Use osascript subprocess instead of NSAppleScript to avoid blocking
         // during modal dialogs

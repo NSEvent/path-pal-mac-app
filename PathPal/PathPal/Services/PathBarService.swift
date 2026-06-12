@@ -47,8 +47,11 @@ final class PathBarService {
             }
     }
 
-    /// Navigate Finder to the given path.
+    /// Navigate Finder to the given path. Runs off the main thread so a busy
+    /// Finder can't beachball the app while the path bar dismisses.
     static func navigateFinder(to path: String) {
-        FinderScriptingService.shared.navigateFinderTo(path: path)
+        DispatchQueue.global(qos: .userInitiated).async {
+            FinderScriptingService.shared.navigateFinderTo(path: path)
+        }
     }
 }

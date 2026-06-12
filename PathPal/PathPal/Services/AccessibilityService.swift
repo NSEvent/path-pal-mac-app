@@ -213,7 +213,7 @@ final class AccessibilityService {
             let appElement = AXUIElementCreateApplication(pid)
             var focusedWindow: CFTypeRef?
             AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedWindow)
-            if let focusedWindow = focusedWindow {
+            if let focusedWindow, CFGetTypeID(focusedWindow) == AXUIElementGetTypeID() {
                 buttonTitles = findButtonTitles(in: (focusedWindow as! AXUIElement), depth: 0)
             }
         }

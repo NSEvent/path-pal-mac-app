@@ -91,7 +91,7 @@ final class MenuBarService: NSObject, NSMenuDelegate {
         let foldersSubmenu = NSMenu()
         foldersSubmenu.delegate = self
 
-        let folders = recentItemsService.recentFolders.prefix(20)
+        let folders = recentItemsService.recentFolders.prefix(SettingsService.shared.maxRecentFolders)
         if folders.isEmpty {
             foldersSubmenu.addItem(NSMenuItem(title: "No recent folders", action: nil, keyEquivalent: ""))
         } else {
@@ -118,7 +118,7 @@ final class MenuBarService: NSObject, NSMenuDelegate {
         let filesItem = NSMenuItem(title: "Recent Files", action: nil, keyEquivalent: "")
         let filesSubmenu = NSMenu()
 
-        let files = recentItemsService.recentFiles.prefix(20)
+        let files = recentItemsService.recentFiles.prefix(SettingsService.shared.maxRecentFiles)
         if files.isEmpty {
             filesSubmenu.addItem(NSMenuItem(title: "No recent files", action: nil, keyEquivalent: ""))
         } else {

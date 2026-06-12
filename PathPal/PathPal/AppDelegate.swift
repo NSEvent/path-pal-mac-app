@@ -155,6 +155,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         let panel = PathBarPanel()
         let pathBarView = PathBarView(
+            initialPath: PathBarService.frontFinderWindowPathViaAX() ?? appState.finderWindows.first?.path,
+            resolveFrontFinderPath: { completion in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let path = FinderScriptingService.shared.getFinderWindows().first?.path
+                    DispatchQueue.main.async { completion(path) }
+                }
+            },
             onNavigate: { [weak self] path in
                 PathBarService.navigateFinder(to: path)
                 self?.pathBarPanel?.close()

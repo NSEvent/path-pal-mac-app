@@ -1,9 +1,15 @@
 import Carbon
 import AppKit
 
+/// Cmd+L hotkey, armed only while Finder is frontmost.
+/// Uses Carbon RegisterEventHotKey (not an NSEvent monitor) so the keystroke
+/// is consumed — otherwise Finder also receives Cmd+L and beeps. Registering
+/// per-activation keeps Cmd+L untouched in every other app (browsers etc.).
 final class HotKeyService {
-    private var globalMonitor: Any?
+    private var hotKeyRef: EventHotKeyRef?
+    private var eventHandlerRef: EventHandlerRef?
     private var onHotKey: (() -> Void)?
+    private var workspaceObservers: [NSObjectProtocol] = []
 
     private static func debugLog(_ message: String) {
         let dir = FileManager.default.homeDirectoryForCurrentUser
@@ -21,36 +27,73 @@ final class HotKeyService {
         }
     }
 
-    /// Register Cmd+L as a hotkey that only fires when Finder is frontmost.
     func register(onHotKey: @escaping () -> Void) {
         unregister()
         self.onHotKey = onHotKey
 
-        HotKeyService.debugLog("Registering Cmd+L via NSEvent global monitor")
+        var eventType = EventTypeSpec(
+            eventClass: OSType(kEventClassKeyboard),
+            eventKind: UInt32(kEventHotKeyPressed)
+        )
+        InstallEventHandler(
+            GetEventDispatcherTarget(),
+            { _, _, userData in
+                guard let userData else { return noErr }
+                let service = Unmanaged<HotKeyService>.fromOpaque(userData).takeUnretainedValue()
+                service.onHotKey?()
+                return noErr
+            },
+            1, &eventType,
+            Unmanaged.passUnretained(self).toOpaque(),
+            &eventHandlerRef
+        )
 
-        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-            // Check for Cmd+L only (command key, no shift/opt/ctrl)
-            guard flags == .command,
-                  event.keyCode == UInt16(kVK_ANSI_L) else {
-                return
+        let nc = NSWorkspace.shared.notificationCenter
+        workspaceObservers.append(nc.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil, queue: .main
+        ) { [weak self] note in
+            let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            if app?.bundleIdentifier == "com.apple.finder" {
+                self?.armHotKey()
+            } else {
+                self?.disarmHotKey()
             }
+        })
 
-            if let frontApp = NSWorkspace.shared.frontmostApplication,
-               frontApp.bundleIdentifier == "com.apple.finder" {
-                HotKeyService.debugLog("Cmd+L fired in Finder — showing path bar")
-                self?.onHotKey?()
-            }
+        if NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.apple.finder" {
+            armHotKey()
         }
+        HotKeyService.debugLog("Cmd+L Carbon hotkey installed (arms when Finder is frontmost)")
+    }
 
-        HotKeyService.debugLog("Cmd+L global monitor registered successfully")
+    private func armHotKey() {
+        guard hotKeyRef == nil, SettingsService.shared.pathBarHotKeyEnabled else { return }
+        let hotKeyID = EventHotKeyID(signature: OSType(0x5050_4C31), id: 1) // "PPL1"
+        let status = RegisterEventHotKey(
+            UInt32(kVK_ANSI_L), UInt32(cmdKey), hotKeyID,
+            GetEventDispatcherTarget(), 0, &hotKeyRef
+        )
+        HotKeyService.debugLog("Cmd+L armed (Finder frontmost), status \(status)")
+    }
+
+    private func disarmHotKey() {
+        if let ref = hotKeyRef {
+            UnregisterEventHotKey(ref)
+            hotKeyRef = nil
+            HotKeyService.debugLog("Cmd+L disarmed (Finder resigned frontmost)")
+        }
     }
 
     func unregister() {
-        if let monitor = globalMonitor {
-            NSEvent.removeMonitor(monitor)
-            globalMonitor = nil
+        disarmHotKey()
+        if let handler = eventHandlerRef {
+            RemoveEventHandler(handler)
+            eventHandlerRef = nil
         }
+        let nc = NSWorkspace.shared.notificationCenter
+        workspaceObservers.forEach { nc.removeObserver($0) }
+        workspaceObservers.removeAll()
         onHotKey = nil
     }
 

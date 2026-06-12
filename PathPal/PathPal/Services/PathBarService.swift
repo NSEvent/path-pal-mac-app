@@ -1,6 +1,32 @@
 import Foundation
+import AppKit
+import ApplicationServices
 
 final class PathBarService {
+    /// Front Finder window's folder, read synchronously via Accessibility.
+    /// ~1 ms vs ~200 ms for the AppleScript round-trip, so the path bar can
+    /// seed its field before first render. Returns nil for windows without
+    /// an AXDocument (e.g. Recents), where the AppleScript fallback applies.
+    static func frontFinderWindowPathViaAX() -> String? {
+        guard let finder = NSRunningApplication
+            .runningApplications(withBundleIdentifier: "com.apple.finder").first else { return nil }
+        let app = AXUIElementCreateApplication(finder.processIdentifier)
+
+        var windowRef: CFTypeRef?
+        if AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &windowRef) != .success {
+            AXUIElementCopyAttributeValue(app, kAXMainWindowAttribute as CFString, &windowRef)
+        }
+        guard let windowRef, CFGetTypeID(windowRef) == AXUIElementGetTypeID() else { return nil }
+        let window = windowRef as! AXUIElement
+
+        var docRef: CFTypeRef?
+        AXUIElementCopyAttributeValue(window, kAXDocumentAttribute as CFString, &docRef)
+        guard let doc = docRef as? String else { return nil }
+        if let url = URL(string: doc), url.isFileURL { return url.path }
+        if doc.hasPrefix("/") { return doc }
+        return nil
+    }
+
     /// Returns autocomplete suggestions for a partial path.
     static func completions(for input: String) -> [String] {
         guard !input.isEmpty else { return [] }

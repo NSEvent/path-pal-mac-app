@@ -7,13 +7,38 @@ enum OpenTarget: String, CaseIterable {
 }
 
 struct PathBarView: View {
-    @State private var inputText: String = NSHomeDirectory() + "/"
+    @State private var inputText: String
     @State private var completions: [String] = []
     @State private var selectedIndex: Int = 0
     @State private var openTarget: OpenTarget = .finder
+    private let seededText: String
+    let resolveFrontFinderPath: ((@escaping (String?) -> Void) -> Void)?
     let onNavigate: (String) -> Void
     let onOpen: (String, OpenTarget) -> Void
     let onDismiss: () -> Void
+
+    init(
+        initialPath: String? = nil,
+        resolveFrontFinderPath: ((@escaping (String?) -> Void) -> Void)? = nil,
+        onNavigate: @escaping (String) -> Void,
+        onOpen: @escaping (String, OpenTarget) -> Void,
+        onDismiss: @escaping () -> Void
+    ) {
+        let seed = Self.directoryText(initialPath) ?? NSHomeDirectory() + "/"
+        self.seededText = seed
+        _inputText = State(initialValue: seed)
+        self.resolveFrontFinderPath = resolveFrontFinderPath
+        self.onNavigate = onNavigate
+        self.onOpen = onOpen
+        self.onDismiss = onDismiss
+    }
+
+    /// Normalize a folder path for the input field (trailing slash so
+    /// completions list the folder's children).
+    private static func directoryText(_ path: String?) -> String? {
+        guard let path, !path.isEmpty else { return nil }
+        return path.hasSuffix("/") ? path : path + "/"
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -122,6 +147,16 @@ struct PathBarView: View {
         .shadow(color: .black.opacity(0.3), radius: 20)
         .onAppear {
             updateCompletions(for: inputText)
+            // The seed comes from the polled cache, which can lag behind the
+            // user's latest Finder navigation — confirm with a live fetch and
+            // apply it only if the user hasn't started typing.
+            resolveFrontFinderPath? { freshPath in
+                guard inputText == seededText,
+                      let fresh = Self.directoryText(freshPath),
+                      fresh != inputText else { return }
+                inputText = fresh
+                updateCompletions(for: fresh)
+            }
         }
     }
 

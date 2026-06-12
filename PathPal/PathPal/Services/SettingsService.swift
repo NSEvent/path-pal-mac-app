@@ -18,6 +18,7 @@ final class SettingsService {
         static let pathBarHotKeyEnabled = "pathBarHotKeyEnabled"
         static let finderPollingInterval = "finderPollingInterval"
         static let hasCompletedOnboarding = "hasCompletedOnboarding"
+        static let fileDrawerEnabled = "fileDrawerEnabled"
     }
 
     var launchAtLogin: Bool {
@@ -87,5 +88,10 @@ final class SettingsService {
     var hasCompletedOnboarding: Bool {
         get { defaults.bool(forKey: Keys.hasCompletedOnboarding) }
         set { defaults.set(newValue, forKey: Keys.hasCompletedOnboarding) }
+    }
+
+    var fileDrawerEnabled: Bool {
+        get { defaults.bool(forKey: Keys.fileDrawerEnabled) }
+        set { defaults.set(newValue, forKey: Keys.fileDrawerEnabled) }
     }
 }

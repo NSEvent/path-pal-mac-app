@@ -40,6 +40,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             showOnboarding()
         }
 
+        if SettingsService.shared.fileDrawerEnabled {
+            FileDrawerService.shared.show()
+        }
+        NotificationCenter.default.addObserver(
+            forName: FileDrawerService.visibilityChangedNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.menuBarService.refreshMenu()
+        }
+
         // Prompt for Full Disk Access if not yet granted (needed for Finder
         // favorites). FDA is optional, so nag at most once — after that it's
         // discoverable in onboarding and Settings.

@@ -85,6 +85,21 @@ struct SettingsView: View {
                     ))
                 }
 
+                settingsCard(icon: "tray.full", iconColor: .indigo, title: "File Drawer") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        settingsToggle("Enable file drawer", isOn: Binding(
+                            get: { settings.fileDrawerEnabled },
+                            set: {
+                                settings.fileDrawerEnabled = $0
+                                FileDrawerService.shared.setEnabled($0)
+                            }
+                        ))
+                        Text("A floating shelf: drag files onto it to park them, then drag them out to Finder, dialogs, or other apps.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 settingsCard(icon: "lock.shield", iconColor: .green, title: "Permissions") {
                     VStack(spacing: 12) {
                         permissionRow("Accessibility", isGranted: isAccessibilityGranted) {

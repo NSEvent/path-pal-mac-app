@@ -10,6 +10,7 @@
 - **Finder window highlighting** — your open Finder windows get color-coded highlight overlays while a dialog is up; click a window (or its name pill) to send the dialog to that folder.
 - **Menu bar quick access** — recent folders and files, Finder favorites, and Quick Access folders from the menu bar, with hover-to-browse submenus two levels deep.
 - **Path bar (Cmd+L)** — a Spotlight-style "go to folder" bar for Finder with path autocomplete. Open the target in Finder or jump straight to it in iTerm.
+- **File drawer** *(optional, enable in Settings)* — a floating shelf you drag files onto to park them, then drag them back out to Finder, dialogs, or other apps. Contents persist across launches; the shelf never steals focus.
 - **Finder toolbar button** — optional FinderSync extension adds a PathPal button to Finder's toolbar.
 - **Launch at login** — one toggle in Settings.
 

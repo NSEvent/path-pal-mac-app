@@ -140,6 +140,16 @@ final class MenuBarService: NSObject, NSMenuDelegate {
         pathBarItem.target = self
         menu.addItem(pathBarItem)
 
+        if SettingsService.shared.fileDrawerEnabled {
+            let drawerItem = NSMenuItem(
+                title: FileDrawerService.shared.isVisible ? "Hide File Drawer" : "Show File Drawer",
+                action: #selector(toggleFileDrawer),
+                keyEquivalent: ""
+            )
+            drawerItem.target = self
+            menu.addItem(drawerItem)
+        }
+
         menu.addItem(.separator())
 
         let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ",")
@@ -225,6 +235,11 @@ final class MenuBarService: NSObject, NSMenuDelegate {
 
     @objc private func showPathBar() {
         onShowPathBar?()
+    }
+
+    @objc private func toggleFileDrawer() {
+        FileDrawerService.shared.toggleVisibility()
+        refreshMenu()
     }
 
     @objc private func openSettings() {

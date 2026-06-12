@@ -3,7 +3,8 @@ import UniformTypeIdentifiers
 
 struct FileDrawerView: View {
     var state: FileDrawerState
-    let onAdd: ([URL]) -> Void
+    /// Add URLs at an index (drop-to-insert), or append when index is nil.
+    let onAdd: ([URL], Int?) -> Void
     let onRemove: (URL) -> Void
     let onClear: () -> Void
 
@@ -44,6 +45,11 @@ struct FileDrawerView: View {
                     LazyVStack(spacing: 2) {
                         ForEach(state.items, id: \.path) { url in
                             itemRow(url)
+                        }
+                        .onInsert(of: [UTType.fileURL]) { index, providers in
+                            loadURLs(from: providers) { urls in
+                                onAdd(urls, index)
+                            }
                         }
                     }
                     .padding(6)
@@ -118,18 +124,39 @@ struct FileDrawerView: View {
                 .fill(hoveredItem == url.path ? Color.primary.opacity(0.07) : Color.clear)
         )
         .contentShape(Rectangle())
+        // AppKit drag source behind the row content: starts a real dragging
+        // session carrying the file URL, which Finder and dialogs accept.
+        // SwiftUI's .onDrag can't do this here — the non-activating panel's
+        // window-move-by-background would swallow the gesture.
+        .background(FileDragSource(url: url))
         .onHover { hovering in
             hoveredItem = hovering ? url.path : (hoveredItem == url.path ? nil : hoveredItem)
-        }
-        .onDrag {
-            NSItemProvider(object: url as NSURL)
         }
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
-        var accepted = false
-        for provider in providers where provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
-            accepted = true
+        let fileProviders = providers.filter {
+            $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier)
+        }
+        guard !fileProviders.isEmpty else { return false }
+        loadURLs(from: fileProviders) { urls in
+            onAdd(urls, nil)
+        }
+        return true
+    }
+
+    /// Resolve file URLs from providers, preserving their order; completion
+    /// runs on the main queue.
+    private func loadURLs(from providers: [NSItemProvider], completion: @escaping ([URL]) -> Void) {
+        let fileProviders = providers.filter {
+            $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier)
+        }
+        guard !fileProviders.isEmpty else { return }
+        var results = [URL?](repeating: nil, count: fileProviders.count)
+        let lock = NSLock()
+        let group = DispatchGroup()
+        for (index, provider) in fileProviders.enumerated() {
+            group.enter()
             provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
                 var url: URL?
                 if let data = item as? Data {
@@ -137,11 +164,69 @@ struct FileDrawerView: View {
                 } else if let itemURL = item as? URL {
                     url = itemURL
                 }
-                if let url {
-                    DispatchQueue.main.async { onAdd([url]) }
-                }
+                lock.lock()
+                results[index] = url
+                lock.unlock()
+                group.leave()
             }
         }
-        return accepted
+        group.notify(queue: .main) {
+            completion(results.compactMap { $0 })
+        }
+    }
+}
+
+// MARK: - AppKit drag-out source
+
+/// Transparent NSView behind each row that starts a real AppKit dragging
+/// session with the file URL on mouse-drag. `mouseDownCanMoveWindow` is
+/// disabled so the gesture drags the file, not the panel.
+private struct FileDragSource: NSViewRepresentable {
+    let url: URL
+
+    func makeNSView(context: Context) -> DragSourceNSView {
+        let view = DragSourceNSView()
+        view.url = url
+        return view
+    }
+
+    func updateNSView(_ view: DragSourceNSView, context: Context) {
+        view.url = url
+    }
+
+    final class DragSourceNSView: NSView, NSDraggingSource {
+        var url: URL?
+        private var mouseDownLocation: NSPoint?
+
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+        override var mouseDownCanMoveWindow: Bool { false }
+
+        override func mouseDown(with event: NSEvent) {
+            mouseDownLocation = event.locationInWindow
+        }
+
+        override func mouseDragged(with event: NSEvent) {
+            guard let url,
+                  let start = mouseDownLocation,
+                  hypot(event.locationInWindow.x - start.x,
+                        event.locationInWindow.y - start.y) > 4 else { return }
+            mouseDownLocation = nil
+
+            let item = NSDraggingItem(pasteboardWriter: url as NSURL)
+            let icon = NSWorkspace.shared.icon(forFile: url.path)
+            let size = NSSize(width: 32, height: 32)
+            let point = convert(event.locationInWindow, from: nil)
+            item.setDraggingFrame(
+                NSRect(x: point.x - size.width / 2, y: point.y - size.height / 2,
+                       width: size.width, height: size.height),
+                contents: icon
+            )
+            beginDraggingSession(with: [item], event: event, source: self)
+        }
+
+        func draggingSession(_ session: NSDraggingSession,
+                             sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
+            context == .outsideApplication ? [.copy, .generic] : .generic
+        }
     }
 }

@@ -27,14 +27,45 @@ final class FileDrawerServiceTests: XCTestCase {
         XCTAssertEqual(service.state.items.map(\.lastPathComponent), ["a.txt"])
     }
 
-    func testAddDeduplicatesAndMovesToFront() throws {
+    func testAddPreservesDropOrder() throws {
+        let service = FileDrawerService(storageDirectory: tempDir)
+        let a = try makeFile("a.txt")
+        let b = try makeFile("b.txt")
+        let c = try makeFile("c.txt")
+        service.addFiles([a, b, c])
+        XCTAssertEqual(service.state.items.map(\.lastPathComponent), ["a.txt", "b.txt", "c.txt"])
+    }
+
+    func testAddDeduplicatesAndMovesToDropPosition() throws {
         let service = FileDrawerService(storageDirectory: tempDir)
         let a = try makeFile("a.txt")
         let b = try makeFile("b.txt")
         service.addFiles([a, b])
         service.addFiles([a])
-        XCTAssertEqual(service.state.items.map(\.lastPathComponent), ["a.txt", "b.txt"])
+        XCTAssertEqual(service.state.items.map(\.lastPathComponent), ["b.txt", "a.txt"])
         XCTAssertEqual(service.state.items.count, 2)
+    }
+
+    func testInsertAtIndex() throws {
+        let service = FileDrawerService(storageDirectory: tempDir)
+        let a = try makeFile("a.txt")
+        let b = try makeFile("b.txt")
+        let c = try makeFile("c.txt")
+        service.addFiles([a, b])
+        service.addFiles([c], at: 1)
+        XCTAssertEqual(service.state.items.map(\.lastPathComponent), ["a.txt", "c.txt", "b.txt"])
+    }
+
+    func testReorderExistingItemViaInsert() throws {
+        let service = FileDrawerService(storageDirectory: tempDir)
+        let a = try makeFile("a.txt")
+        let b = try makeFile("b.txt")
+        let c = try makeFile("c.txt")
+        service.addFiles([a, b, c])
+        service.addFiles([c], at: 0)
+        XCTAssertEqual(service.state.items.map(\.lastPathComponent), ["c.txt", "a.txt", "b.txt"])
+        service.addFiles([c], at: 3)
+        XCTAssertEqual(service.state.items.map(\.lastPathComponent), ["a.txt", "b.txt", "c.txt"])
     }
 
     func testAddSkipsNonexistentFiles() {

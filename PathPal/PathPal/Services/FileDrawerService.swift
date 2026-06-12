@@ -32,12 +32,21 @@ final class FileDrawerService {
 
     // MARK: - Items
 
-    func addFiles(_ urls: [URL]) {
-        for url in urls.reversed() {
+    /// Insert files at a specific position (drop-to-insert), or append at the
+    /// end when no index is given. Re-adding an existing file moves it to the
+    /// drop position, so dragging rows around reorders the list.
+    func addFiles(_ urls: [URL], at index: Int? = nil) {
+        var insertAt = min(index ?? state.items.count, state.items.count)
+        for url in urls {
             let standardized = url.standardizedFileURL
             guard FileManager.default.fileExists(atPath: standardized.path) else { continue }
-            state.items.removeAll { $0.path == standardized.path }
-            state.items.insert(standardized, at: 0)
+            if let existing = state.items.firstIndex(where: { $0.path == standardized.path }) {
+                state.items.remove(at: existing)
+                if existing < insertAt { insertAt -= 1 }
+            }
+            insertAt = max(0, min(insertAt, state.items.count))
+            state.items.insert(standardized, at: insertAt)
+            insertAt += 1
         }
         if state.items.count > maxItems {
             state.items = Array(state.items.prefix(maxItems))
@@ -86,7 +95,7 @@ final class FileDrawerService {
         if panel == nil {
             panel = FileDrawerPanel(rootView: FileDrawerView(
                 state: state,
-                onAdd: { [weak self] urls in self?.addFiles(urls) },
+                onAdd: { [weak self] urls, index in self?.addFiles(urls, at: index) },
                 onRemove: { [weak self] url in self?.removeFile(url) },
                 onClear: { [weak self] in self?.clear() }
             ))

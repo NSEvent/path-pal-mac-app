@@ -69,6 +69,9 @@ struct FileDrawerView: View {
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
             handleDrop(providers)
         }
+        .onPreferenceChange(RowFramesKey.self) { frames in
+            state.rowFrames = frames
+        }
     }
 
     private var emptyState: some View {
@@ -91,21 +94,29 @@ struct FileDrawerView: View {
 
     private func itemRow(_ url: URL) -> some View {
         HStack(spacing: 7) {
-            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
-                .resizable()
-                .frame(width: 22, height: 22)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(url.lastPathComponent)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Text(url.deletingLastPathComponent().lastPathComponent)
-                    .font(.system(size: 9))
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
+            HStack(spacing: 7) {
+                Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                    .resizable()
+                    .frame(width: 22, height: 22)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(url.lastPathComponent)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Text(url.deletingLastPathComponent().lastPathComponent)
+                        .font(.system(size: 9))
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
+            // Publish this row's frame so the panel can map mouse-downs to
+            // rows and start drag-out sessions (see FileDrawerPanel.sendEvent).
+            .background(GeometryReader { geo in
+                Color.clear.preference(key: RowFramesKey.self,
+                                       value: [url.path: geo.frame(in: .global)])
+            })
             if hoveredItem == url.path {
                 Button {
                     onRemove(url)
@@ -124,11 +135,6 @@ struct FileDrawerView: View {
                 .fill(hoveredItem == url.path ? Color.primary.opacity(0.07) : Color.clear)
         )
         .contentShape(Rectangle())
-        // AppKit drag source behind the row content: starts a real dragging
-        // session carrying the file URL, which Finder and dialogs accept.
-        // SwiftUI's .onDrag can't do this here — the non-activating panel's
-        // window-move-by-background would swallow the gesture.
-        .background(FileDragSource(url: url))
         .onHover { hovering in
             hoveredItem = hovering ? url.path : (hoveredItem == url.path ? nil : hoveredItem)
         }
@@ -176,57 +182,14 @@ struct FileDrawerView: View {
     }
 }
 
-// MARK: - AppKit drag-out source
+// MARK: - Row frame publishing
 
-/// Transparent NSView behind each row that starts a real AppKit dragging
-/// session with the file URL on mouse-drag. `mouseDownCanMoveWindow` is
-/// disabled so the gesture drags the file, not the panel.
-private struct FileDragSource: NSViewRepresentable {
-    let url: URL
+/// Row frames in SwiftUI global coordinates, keyed by file path. The panel
+/// uses these to map mouse-downs to rows for drag-out.
+struct RowFramesKey: PreferenceKey {
+    static var defaultValue: [String: CGRect] = [:]
 
-    func makeNSView(context: Context) -> DragSourceNSView {
-        let view = DragSourceNSView()
-        view.url = url
-        return view
-    }
-
-    func updateNSView(_ view: DragSourceNSView, context: Context) {
-        view.url = url
-    }
-
-    final class DragSourceNSView: NSView, NSDraggingSource {
-        var url: URL?
-        private var mouseDownLocation: NSPoint?
-
-        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-        override var mouseDownCanMoveWindow: Bool { false }
-
-        override func mouseDown(with event: NSEvent) {
-            mouseDownLocation = event.locationInWindow
-        }
-
-        override func mouseDragged(with event: NSEvent) {
-            guard let url,
-                  let start = mouseDownLocation,
-                  hypot(event.locationInWindow.x - start.x,
-                        event.locationInWindow.y - start.y) > 4 else { return }
-            mouseDownLocation = nil
-
-            let item = NSDraggingItem(pasteboardWriter: url as NSURL)
-            let icon = NSWorkspace.shared.icon(forFile: url.path)
-            let size = NSSize(width: 32, height: 32)
-            let point = convert(event.locationInWindow, from: nil)
-            item.setDraggingFrame(
-                NSRect(x: point.x - size.width / 2, y: point.y - size.height / 2,
-                       width: size.width, height: size.height),
-                contents: icon
-            )
-            beginDraggingSession(with: [item], event: event, source: self)
-        }
-
-        func draggingSession(_ session: NSDraggingSession,
-                             sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
-            context == .outsideApplication ? [.copy, .generic] : .generic
-        }
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue()) { _, new in new }
     }
 }

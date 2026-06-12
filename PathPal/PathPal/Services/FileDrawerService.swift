@@ -5,6 +5,9 @@ import SwiftUI
 @Observable
 final class FileDrawerState {
     var items: [URL] = []
+    /// Row frames in SwiftUI global (top-left window) coordinates, published
+    /// by the view so the panel can map mouse-downs to rows for drag-out.
+    @ObservationIgnored var rowFrames: [String: CGRect] = [:]
 }
 
 /// A Default Folder X-style file drawer: a floating shelf users drag files
@@ -98,7 +101,7 @@ final class FileDrawerService {
                 onAdd: { [weak self] urls, index in self?.addFiles(urls, at: index) },
                 onRemove: { [weak self] url in self?.removeFile(url) },
                 onClear: { [weak self] in self?.clear() }
-            ))
+            ), state: state)
         }
         panel?.orderFrontRegardless()
         NotificationCenter.default.post(name: Self.visibilityChangedNotification, object: nil)

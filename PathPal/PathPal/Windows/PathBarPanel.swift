@@ -20,9 +20,31 @@ final class PathBarPanel: NSPanel {
         hasShadow = true
         isMovableByWindowBackground = true
         hidesOnDeactivate = false
+        isReleasedWhenClosed = false
+
+        // Spotlight-style bar: no window chrome. Esc, Enter, or clicking
+        // away dismisses it.
+        standardWindowButton(.closeButton)?.isHidden = true
+        standardWindowButton(.miniaturizeButton)?.isHidden = true
+        standardWindowButton(.zoomButton)?.isHidden = true
     }
 
     override var canBecomeKey: Bool { true }
+
+    private var isFadingOut = false
+
+    /// Fade out briefly instead of vanishing on the spot.
+    override func close() {
+        guard !isFadingOut else { return }
+        isFadingOut = true
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.12
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            animator().alphaValue = 0
+        }, completionHandler: {
+            super.close()
+        })
+    }
 
     override func resignKey() {
         super.resignKey()

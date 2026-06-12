@@ -105,7 +105,9 @@ struct PathBarView: View {
                     }
                     .frame(height: CGFloat(visible.count) * 30)
                     .onChange(of: selectedIndex) { _, newIndex in
-                        proxy.scrollTo(newIndex, anchor: .center)
+                        if newIndex >= 0 {
+                            proxy.scrollTo(newIndex, anchor: .center)
+                        }
                     }
                 }
             }
@@ -116,6 +118,7 @@ struct PathBarView: View {
             HStack(spacing: 12) {
                 hintLabel("Tab", "complete")
                 hintLabel("Enter", "open")
+                hintLabel("Esc", "close")
 
                 Spacer()
 
@@ -174,20 +177,36 @@ struct PathBarView: View {
         }
     }
 
+    /// "foo/", "foo/.." and "foo/." reference a directory itself — the list
+    /// below is then a browse list of its children, not match candidates.
+    private static func isDirectoryReference(_ input: String) -> Bool {
+        let expanded = (input as NSString).expandingTildeInPath
+        let last = (expanded as NSString).lastPathComponent
+        return input.hasSuffix("/") || last == ".." || last == "."
+    }
+
     private func updateCompletions(for input: String) {
         completions = PathBarService.completions(for: input)
-        selectedIndex = 0
+        // Browsing a directory: nothing pre-selected, Enter opens the typed
+        // path. Completing a partial name: best match pre-selected.
+        selectedIndex = Self.isDirectoryReference(input) ? -1 : 0
     }
 
     private func moveSelection(_ delta: Int) {
         guard !completions.isEmpty else { return }
         let count = min(completions.count, 10)
-        selectedIndex = (selectedIndex + delta + count) % count
+        if selectedIndex < 0 {
+            selectedIndex = delta > 0 ? 0 : count - 1
+        } else {
+            selectedIndex = (selectedIndex + delta + count) % count
+        }
     }
 
     private func acceptCompletion() {
-        guard !completions.isEmpty, selectedIndex < completions.count else { return }
-        let path = completions[selectedIndex]
+        guard !completions.isEmpty else { return }
+        let index = max(selectedIndex, 0)
+        guard index < completions.count else { return }
+        let path = completions[index]
         inputText = path
         updateCompletions(for: path)
     }
@@ -204,14 +223,18 @@ struct PathBarView: View {
     }
 
     private func openCurrent(target: OpenTarget) {
-        let path: String
-        if !completions.isEmpty, selectedIndex < completions.count {
-            path = completions[selectedIndex]
+        let raw: String
+        if selectedIndex >= 0, selectedIndex < completions.count {
+            raw = completions[selectedIndex]
         } else {
-            path = (inputText as NSString).expandingTildeInPath
+            raw = (inputText as NSString).expandingTildeInPath
         }
-        // For files, open the parent directory
-        let dirPath = path.hasSuffix("/") ? String(path.dropLast()) : (path as NSString).deletingLastPathComponent
+        // Resolve "." / ".." so "/Users/kevin/Movies/.." opens /Users/kevin
+        let path = (raw as NSString).standardizingPath
+        var isDirectory: ObjCBool = false
+        let exists = FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
+        // Folders open directly; files (and unknowns) open their parent
+        let dirPath = (exists && isDirectory.boolValue) ? path : (path as NSString).deletingLastPathComponent
         onOpen(dirPath, target)
     }
 

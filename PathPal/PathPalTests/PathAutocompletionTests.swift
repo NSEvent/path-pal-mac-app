@@ -38,4 +38,22 @@ final class PathAutocompletionTests: XCTestCase {
         let completions = PathBarService.completions(for: "~/")
         XCTAssertFalse(completions.isEmpty, "~ should expand to home directory and list contents")
     }
+
+    func testParentDirectoryReference() {
+        // /usr/bin/.. references /usr — should list its contents
+        let completions = PathBarService.completions(for: "/usr/bin/..")
+        XCTAssertTrue(completions.contains { $0.hasPrefix("/usr/bin") }, "Listing /usr should include bin")
+    }
+
+    func testParentDirectoryMidPathStandardizes() {
+        // /usr/bin/../bi standardizes to /usr/bi — should complete to /usr/bin
+        let completions = PathBarService.completions(for: "/usr/bin/../bi")
+        XCTAssertTrue(completions.contains { $0.hasPrefix("/usr/bin") })
+    }
+
+    func testSingleDotReferencesSameDirectory() {
+        // /usr/. references /usr — should list its contents
+        let completions = PathBarService.completions(for: "/usr/.")
+        XCTAssertTrue(completions.contains { $0.hasPrefix("/usr/bin") })
+    }
 }

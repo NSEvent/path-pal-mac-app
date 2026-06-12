@@ -28,15 +28,19 @@ final class PathBarService {
     }
 
     /// Returns autocomplete suggestions for a partial path.
+    /// "." and ".." components are resolved, so "/Users/kevin/Movies/.."
+    /// lists the contents of /Users/kevin.
     static func completions(for input: String) -> [String] {
         guard !input.isEmpty else { return [] }
 
         let expanded = (input as NSString).expandingTildeInPath
-        let url = URL(fileURLWithPath: expanded)
+        let standardized = (expanded as NSString).standardizingPath
+        let lastComponent = (expanded as NSString).lastPathComponent
+        let url = URL(fileURLWithPath: standardized)
         let fm = FileManager.default
 
-        // If input ends with "/", list directory contents
-        if input.hasSuffix("/") {
+        // "foo/", "foo/.." and "foo/." all reference a directory — list its contents
+        if input.hasSuffix("/") || lastComponent == ".." || lastComponent == "." {
             guard let contents = try? fm.contentsOfDirectory(
                 at: url,
                 includingPropertiesForKeys: [.isDirectoryKey],

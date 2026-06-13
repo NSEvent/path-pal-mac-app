@@ -6,6 +6,7 @@ final class MenuBarService: NSObject, NSMenuDelegate {
     private let recentItemsService: RecentItemsService
     private var onOpenSettings: (() -> Void)?
     private var onShowPathBar: (() -> Void)?
+    private var onCheckForUpdates: (() -> Void)?
 
     init(appState: AppState, recentItemsService: RecentItemsService) {
         self.appState = appState
@@ -13,9 +14,14 @@ final class MenuBarService: NSObject, NSMenuDelegate {
         super.init()
     }
 
-    func setup(onOpenSettings: @escaping () -> Void, onShowPathBar: @escaping () -> Void) {
+    func setup(
+        onOpenSettings: @escaping () -> Void,
+        onShowPathBar: @escaping () -> Void,
+        onCheckForUpdates: (() -> Void)? = nil
+    ) {
         self.onOpenSettings = onOpenSettings
         self.onShowPathBar = onShowPathBar
+        self.onCheckForUpdates = onCheckForUpdates
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem?.button {
@@ -156,6 +162,10 @@ final class MenuBarService: NSObject, NSMenuDelegate {
         settingsItem.target = self
         menu.addItem(settingsItem)
 
+        let updatesItem = NSMenuItem(title: "Check for Updates...", action: #selector(checkForUpdates), keyEquivalent: "")
+        updatesItem.target = self
+        menu.addItem(updatesItem)
+
         let quitItem = NSMenuItem(title: "Quit PathPal", action: #selector(quit), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
@@ -244,6 +254,10 @@ final class MenuBarService: NSObject, NSMenuDelegate {
 
     @objc private func openSettings() {
         onOpenSettings?()
+    }
+
+    @objc private func checkForUpdates() {
+        onCheckForUpdates?()
     }
 
     @objc private func quit() {

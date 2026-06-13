@@ -35,6 +35,16 @@ build:
 
 sign:
 	@test -d "$(APP_PATH)" || (echo "App not found at $(APP_PATH)" && exit 1)
+	@if [ -d "$(APP_PATH)/Contents/Frameworks/Sparkle.framework" ]; then \
+		SPARKLE="$(APP_PATH)/Contents/Frameworks/Sparkle.framework/Versions/B"; \
+		for item in "$$SPARKLE/XPCServices/"*.xpc "$$SPARKLE/Updater.app" "$$SPARKLE/Autoupdate"; do \
+			[ -e "$$item" ] && codesign --force --options runtime $(TIMESTAMP_FLAG) \
+				--sign "$(SIGN_IDENTITY)" "$$item"; \
+		done; \
+		codesign --force --options runtime $(TIMESTAMP_FLAG) \
+			--sign "$(SIGN_IDENTITY)" \
+			"$(APP_PATH)/Contents/Frameworks/Sparkle.framework"; \
+	fi
 	@if [ -d "$(APP_PATH)/Contents/PlugIns/PathPalFinderExtension.appex" ]; then \
 		codesign --force --options runtime $(TIMESTAMP_FLAG) \
 			--entitlements "$(FINDER_EXTENSION_ENTITLEMENTS)" \

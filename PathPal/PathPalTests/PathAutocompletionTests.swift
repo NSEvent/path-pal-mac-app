@@ -56,4 +56,40 @@ final class PathAutocompletionTests: XCTestCase {
         let completions = PathBarService.completions(for: "/usr/.")
         XCTAssertTrue(completions.contains { $0.hasPrefix("/usr/bin") })
     }
+
+    // MARK: - Fuzzy matching
+
+    func testFuzzyScoreMatchesSubsequence() {
+        XCTAssertNotNil(PathBarService.fuzzyScore(query: "fbm", candidate: "folder-buddy-mac-app"))
+        XCTAssertNil(PathBarService.fuzzyScore(query: "xyz", candidate: "folder-buddy-mac-app"))
+        XCTAssertNil(PathBarService.fuzzyScore(query: "mbf", candidate: "folder-buddy-mac-app"), "Out-of-order should not match")
+    }
+
+    func testFuzzyScorePrefersWordBoundaries() {
+        // "fbm" hits f/b/m at hyphen boundaries in folder-buddy-mac-app;
+        // in "fabulousbeam" the b/m are mid-word.
+        let boundary = PathBarService.fuzzyScore(query: "fbm", candidate: "folder-buddy-mac-app") ?? 0
+        let scattered = PathBarService.fuzzyScore(query: "fbm", candidate: "fabulousbeam") ?? 0
+        XCTAssertGreaterThan(boundary, scattered)
+    }
+
+    func testFuzzyFallbackInParentDirectory() {
+        // "lcl" prefix-matches nothing in /usr but is a subsequence of "local"
+        let completions = PathBarService.completions(for: "/usr/lcl")
+        XCTAssertTrue(completions.contains { $0.hasPrefix("/usr/local") })
+    }
+
+    func testBareQueryFuzzyMatchesRecentsByFrecency() {
+        let saved = PathBarService.recentFoldersProvider
+        defer { PathBarService.recentFoldersProvider = saved }
+        PathBarService.recentFoldersProvider = {
+            [
+                RecentFolder(path: "/tmp/folder-buddy-mac-app", lastAccessed: Date(), accessCount: 3),
+                RecentFolder(path: "/tmp/fab-m", lastAccessed: Date(), accessCount: 99),
+            ]
+        }
+        let completions = PathBarService.completions(for: "fbm")
+        XCTAssertEqual(completions.count, 2)
+        XCTAssertTrue(completions[0].contains("folder-buddy-mac-app"), "Higher fuzzy score should outrank raw frecency")
+    }
 }

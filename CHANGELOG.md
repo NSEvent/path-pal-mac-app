@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.0 — 2026-06-12
+
+- **Rebound**: each app's dialogs auto-open in the folder you last used there; pin a folder per app in Settings to lock it
+- Keyboard navigation in the dialog overlay: ⌃⌥↑/⌃⌥↓ select, ⌃⌥↩ open, ⌃1–9 jump to Quick Access/favorites
+- Recent Files section in Open dialogs — click to select the file itself
+- File drawer: click an item while a dialog is open to teleport the dialog there; folder items accept drops (copy into folder); Cmd-click multi-select drags out as a group
+- Cmd+L path bar now works inside Open/Save dialogs and drives the dialog
+- Fuzzy path matching: "fbm" finds folder-buddy-mac-app (frecency-ranked for bare queries)
+- Per-app exclusion list — PathPal leaves chosen apps' dialogs alone
+- Live demo dialog right after onboarding
+- Sparkle auto-updates (Check for Updates in the menu bar)
+
 ## 0.1.0 — 2026-06-11
 
 Initial release.

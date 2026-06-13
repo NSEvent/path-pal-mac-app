@@ -113,18 +113,29 @@ final class FileDrawerPanel: NSPanel, NSDraggingSource {
 
     private func beginRowDrag(path: String, event: NSEvent) {
         guard let contentView else { return }
-        let url = URL(fileURLWithPath: path)
-        let item = NSDraggingItem(pasteboardWriter: url as NSURL)
-        let icon = NSWorkspace.shared.icon(forFile: path)
+
+        // Dragging a selected row carries the whole selection, in list order.
+        let paths: [String]
+        if drawerState.selectedPaths.contains(path), drawerState.selectedPaths.count > 1 {
+            paths = drawerState.items.map(\.path).filter { drawerState.selectedPaths.contains($0) }
+        } else {
+            paths = [path]
+        }
+
         let size = NSSize(width: 32, height: 32)
         let point = contentView.convert(event.locationInWindow, from: nil)
-        item.setDraggingFrame(
-            NSRect(x: point.x - size.width / 2, y: point.y - size.height / 2,
-                   width: size.width, height: size.height),
-            contents: icon
-        )
-        Self.drawerLog("beginDraggingSession for \(url.lastPathComponent)")
-        contentView.beginDraggingSession(with: [item], event: event, source: self)
+        let items = paths.enumerated().map { index, itemPath in
+            let item = NSDraggingItem(pasteboardWriter: URL(fileURLWithPath: itemPath) as NSURL)
+            let offset = CGFloat(index) * 4
+            item.setDraggingFrame(
+                NSRect(x: point.x - size.width / 2 + offset, y: point.y - size.height / 2 - offset,
+                       width: size.width, height: size.height),
+                contents: NSWorkspace.shared.icon(forFile: itemPath)
+            )
+            return item
+        }
+        Self.drawerLog("beginDraggingSession for \(paths.count) item(s)")
+        contentView.beginDraggingSession(with: items, event: event, source: self)
     }
 
     // MARK: - NSDraggingSource

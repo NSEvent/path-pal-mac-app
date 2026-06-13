@@ -52,11 +52,28 @@ final class PathBarService {
                       width: size.width, height: size.height)
     }
 
+    /// Recent folders used for bare-query fuzzy matching; injectable for tests.
+    static var recentFoldersProvider: () -> [RecentFolder] = {
+        RecentItemsService().recentFolders
+    }
+
     /// Returns autocomplete suggestions for a partial path.
     /// "." and ".." components are resolved, so "/Users/kevin/Movies/.."
-    /// lists the contents of /Users/kevin.
+    /// lists the contents of /Users/kevin. Bare queries (no slash) fuzzy-match
+    /// recent folders, frecency-ranked: "fbm" finds folder-buddy-mac-app.
     static func completions(for input: String) -> [String] {
         guard !input.isEmpty else { return [] }
+
+        // Bare query — fuzzy over recent folders by name
+        if !input.contains("/"), !input.hasPrefix("~") {
+            let scored = recentFoldersProvider().compactMap { folder -> (folder: RecentFolder, score: Int)? in
+                guard let score = fuzzyScore(query: input, candidate: folder.name) else { return nil }
+                return (folder, score)
+            }
+            return scored
+                .sorted { ($0.score, $0.folder.accessCount) > ($1.score, $1.folder.accessCount) }
+                .map { $0.folder.path + "/" }
+        }
 
         let expanded = (input as NSString).expandingTildeInPath
         let standardized = (expanded as NSString).standardizingPath
@@ -93,13 +110,52 @@ final class PathBarService {
             return []
         }
 
-        return contents
+        let prefixMatches = contents
             .filter { $0.lastPathComponent.lowercased().hasPrefix(prefix) }
             .sorted { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }
-            .map { item in
-                let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
-                return isDir ? item.path + "/" : item.path
-            }
+
+        // Fall back to fuzzy subsequence matching when nothing prefix-matches
+        let matches: [URL]
+        if prefixMatches.isEmpty {
+            matches = contents
+                .compactMap { item -> (url: URL, score: Int)? in
+                    guard let score = fuzzyScore(query: prefix, candidate: item.lastPathComponent) else { return nil }
+                    return (item, score)
+                }
+                .sorted { $0.score > $1.score }
+                .map(\.url)
+        } else {
+            matches = prefixMatches
+        }
+
+        return matches.map { item in
+            let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+            return isDir ? item.path + "/" : item.path
+        }
+    }
+
+    /// Subsequence fuzzy score; nil when the query isn't a subsequence of the
+    /// candidate. Word-boundary hits and consecutive runs score higher.
+    static func fuzzyScore(query: String, candidate: String) -> Int? {
+        guard !query.isEmpty else { return nil }
+        let queryChars = Array(query.lowercased())
+        let candidateChars = Array(candidate.lowercased())
+        var queryIndex = 0
+        var score = 0
+        var lastMatch = -2
+        let boundaries: Set<Character> = ["-", "_", " ", "."]
+
+        for (index, char) in candidateChars.enumerated() {
+            guard queryIndex < queryChars.count else { break }
+            guard char == queryChars[queryIndex] else { continue }
+            var points = 1
+            if index == 0 || boundaries.contains(candidateChars[index - 1]) { points += 3 }
+            if index == lastMatch + 1 { points += 2 }
+            score += points
+            lastMatch = index
+            queryIndex += 1
+        }
+        return queryIndex == queryChars.count ? score : nil
     }
 
     /// Navigate Finder to the given path. Runs off the main thread so a busy

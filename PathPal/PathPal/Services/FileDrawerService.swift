@@ -5,6 +5,8 @@ import SwiftUI
 @Observable
 final class FileDrawerState {
     var items: [URL] = []
+    /// Cmd-click multi-selection; a drag from a selected row carries them all.
+    var selectedPaths: Set<String> = []
     /// Row frames in SwiftUI global (top-left window) coordinates, published
     /// by the view so the panel can map mouse-downs to rows for drag-out.
     @ObservationIgnored var rowFrames: [String: CGRect] = [:]
@@ -21,6 +23,10 @@ final class FileDrawerService {
     private var panel: FileDrawerPanel?
     private let storageURL: URL
     private let maxItems = 50
+
+    /// Set by AppDelegate: routes a clicked item to the open Open/Save
+    /// dialog. Returns false when no dialog is up.
+    var dialogNavigator: ((String) -> Bool)?
 
     init(storageDirectory: URL? = nil) {
         let baseDir = storageDirectory ?? FileManager.default
@@ -59,12 +65,54 @@ final class FileDrawerService {
 
     func removeFile(_ url: URL) {
         state.items.removeAll { $0.path == url.path }
+        state.selectedPaths.remove(url.path)
         save()
     }
 
     func clear() {
         state.items.removeAll()
+        state.selectedPaths.removeAll()
         save()
+    }
+
+    /// Click semantics: with a dialog open, clicking teleports the dialog to
+    /// the item (folder, or file — Go To Folder selects files). Otherwise
+    /// clicks manage the multi-selection used for group drag-out.
+    func handleItemClick(_ url: URL, commandKey: Bool) {
+        if dialogNavigator?(url.path) == true { return }
+        if commandKey {
+            if state.selectedPaths.contains(url.path) {
+                state.selectedPaths.remove(url.path)
+            } else {
+                state.selectedPaths.insert(url.path)
+            }
+        } else if state.selectedPaths == [url.path] {
+            state.selectedPaths.removeAll()
+        } else {
+            state.selectedPaths = [url.path]
+        }
+    }
+
+    /// Copy files into a folder item (drawer folder rows act as drop targets).
+    /// Collisions get a numbered suffix; never overwrites.
+    func copyFiles(_ urls: [URL], into folder: URL) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let fm = FileManager.default
+            for url in urls {
+                guard url.standardizedFileURL.path != folder.path,
+                      url.deletingLastPathComponent().path != folder.path else { continue }
+                let base = url.deletingPathExtension().lastPathComponent
+                let ext = url.pathExtension
+                var dest = folder.appendingPathComponent(url.lastPathComponent)
+                var counter = 2
+                while fm.fileExists(atPath: dest.path) {
+                    let suffixed = ext.isEmpty ? "\(base) \(counter)" : "\(base) \(counter).\(ext)"
+                    dest = folder.appendingPathComponent(suffixed)
+                    counter += 1
+                }
+                try? fm.copyItem(at: url, to: dest)
+            }
+        }
     }
 
     /// Drop entries whose files no longer exist on disk.
@@ -100,7 +148,9 @@ final class FileDrawerService {
                 state: state,
                 onAdd: { [weak self] urls, index in self?.addFiles(urls, at: index) },
                 onRemove: { [weak self] url in self?.removeFile(url) },
-                onClear: { [weak self] in self?.clear() }
+                onClear: { [weak self] in self?.clear() },
+                onItemClick: { [weak self] url, commandKey in self?.handleItemClick(url, commandKey: commandKey) },
+                onCopyInto: { [weak self] urls, folder in self?.copyFiles(urls, into: folder) }
             ), state: state)
         }
         panel?.orderFrontRegardless()

@@ -15,6 +15,16 @@ final class DialogNavigationService {
             NSLog("[PathPal] Could not find app for pid %d", pid)
             return
         }
+
+        // Learn this app's folder for rebound (auto-navigating its next dialog)
+        if SettingsService.shared.rememberFolderPerApp, let bundleID = app.bundleIdentifier {
+            AppFolderMemoryService.shared.recordNavigation(
+                toPath: path,
+                bundleID: bundleID,
+                appName: app.localizedName ?? bundleID
+            )
+        }
+
         app.activate()
         NSLog("[PathPal] Activated app: %@", app.localizedName ?? "unknown")
 

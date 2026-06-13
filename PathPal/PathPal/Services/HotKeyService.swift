@@ -10,6 +10,7 @@ final class HotKeyService {
     private var eventHandlerRef: EventHandlerRef?
     private var onHotKey: (() -> Void)?
     private var workspaceObservers: [NSObjectProtocol] = []
+    private var dialogActive = false
 
     private static func debugLog(_ message: String) {
         let dir = FileManager.default.homeDirectoryForCurrentUser
@@ -54,7 +55,7 @@ final class HotKeyService {
             object: nil, queue: .main
         ) { [weak self] note in
             let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
-            if app?.bundleIdentifier == "com.apple.finder" {
+            if app?.bundleIdentifier == "com.apple.finder" || self?.dialogActive == true {
                 self?.armHotKey()
             } else {
                 self?.disarmHotKey()
@@ -73,6 +74,18 @@ final class HotKeyService {
             armHotKey()
         }
         HotKeyService.debugLog("Cmd+L Carbon hotkey installed (arms when Finder is frontmost)")
+    }
+
+    /// Arm Cmd+L while an Open/Save dialog is up in any app, so the path bar
+    /// can drive the dialog. Disarms again when the dialog closes (unless
+    /// Finder is frontmost, which keeps it armed as usual).
+    func setDialogActive(_ active: Bool) {
+        dialogActive = active
+        if active {
+            armHotKey()
+        } else if NSWorkspace.shared.frontmostApplication?.bundleIdentifier != "com.apple.finder" {
+            disarmHotKey()
+        }
     }
 
     private func armHotKey() {

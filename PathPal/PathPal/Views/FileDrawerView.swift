@@ -7,9 +7,14 @@ struct FileDrawerView: View {
     let onAdd: ([URL], Int?) -> Void
     let onRemove: (URL) -> Void
     let onClear: () -> Void
+    /// Click on a row: routes to an open dialog, or manages selection.
+    let onItemClick: (URL, Bool) -> Void
+    /// Copy files into a drawer folder row used as a drop target.
+    let onCopyInto: ([URL], URL) -> Void
 
     @State private var isDropTargeted = false
     @State private var hoveredItem: String?
+    @State private var dropTargetedFolder: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -93,7 +98,13 @@ struct FileDrawerView: View {
     }
 
     private func itemRow(_ url: URL) -> some View {
-        HStack(spacing: 7) {
+        var isDirectory: ObjCBool = false
+        FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
+        let isFolder = isDirectory.boolValue
+        let isSelected = state.selectedPaths.contains(url.path)
+        let isFolderDropTarget = dropTargetedFolder == url.path
+
+        return HStack(spacing: 7) {
             HStack(spacing: 7) {
                 Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
                     .resizable()
@@ -132,12 +143,35 @@ struct FileDrawerView: View {
         .padding(.vertical, 4)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(hoveredItem == url.path ? Color.primary.opacity(0.07) : Color.clear)
+                .fill(isSelected
+                      ? Color.accentColor.opacity(0.25)
+                      : hoveredItem == url.path ? Color.primary.opacity(0.07) : Color.clear)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .strokeBorder(isFolderDropTarget ? Color.accentColor : Color.clear, lineWidth: 1.5)
         )
         .contentShape(Rectangle())
         .onHover { hovering in
             hoveredItem = hovering ? url.path : (hoveredItem == url.path ? nil : hoveredItem)
         }
+        .onTapGesture {
+            let commandKey = NSEvent.modifierFlags.contains(.command)
+            onItemClick(url, commandKey)
+        }
+        .modifier(FolderDropTarget(
+            isFolder: isFolder,
+            isTargeted: Binding(
+                get: { dropTargetedFolder == url.path },
+                set: { dropTargetedFolder = $0 ? url.path : (dropTargetedFolder == url.path ? nil : dropTargetedFolder) }
+            ),
+            onDrop: { providers in
+                loadURLs(from: providers) { urls in
+                    onCopyInto(urls.filter { $0.path != url.path }, url)
+                }
+                return true
+            }
+        ))
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
@@ -178,6 +212,26 @@ struct FileDrawerView: View {
         }
         group.notify(queue: .main) {
             completion(results.compactMap { $0 })
+        }
+    }
+}
+
+// MARK: - Folder drop target
+
+/// Folder rows accept file drops and copy the files into the folder; plain
+/// file rows are left untouched so the list's insert gaps keep working.
+private struct FolderDropTarget: ViewModifier {
+    let isFolder: Bool
+    let isTargeted: Binding<Bool>
+    let onDrop: ([NSItemProvider]) -> Bool
+
+    func body(content: Content) -> some View {
+        if isFolder {
+            content.onDrop(of: [.fileURL], isTargeted: isTargeted) { providers in
+                onDrop(providers)
+            }
+        } else {
+            content
         }
     }
 }

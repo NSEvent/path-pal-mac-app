@@ -1,4 +1,6 @@
 import AppKit
+import ApplicationServices
+import Sparkle
 import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
@@ -7,6 +9,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let recentItemsService = RecentItemsService()
     private let accessibilityService = AccessibilityService()
     private let hotKeyService = HotKeyService()
+    private let dialogNavigationService = DialogNavigationService()
+    private let updaterController = SPUStandardUpdaterController(
+        startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil
+    )
     private var overlayWindowService: OverlayWindowService!
     private var pathBarPanel: PathBarPanel?
     private var finderPollingTimer: Timer?
@@ -24,7 +30,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         menuBarService = MenuBarService(appState: appState, recentItemsService: recentItemsService)
         menuBarService.setup(
             onOpenSettings: { [weak self] in self?.openSettings() },
-            onShowPathBar: { [weak self] in self?.showPathBar() }
+            onShowPathBar: { [weak self] in self?.showPathBar() },
+            onCheckForUpdates: { [weak self] in self?.updaterController.checkForUpdates(nil) }
         )
 
         // Set up overlay service
@@ -38,6 +45,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         if !SettingsService.shared.hasCompletedOnboarding {
             showOnboarding()
+        }
+
+        // Drawer clicks teleport an open dialog to the clicked item
+        FileDrawerService.shared.dialogNavigator = { [weak self] path in
+            self?.overlayWindowService.navigateCurrentDialog(toPath: path) ?? false
         }
 
         if SettingsService.shared.fileDrawerEnabled {
@@ -86,12 +98,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if axGranted {
             accessibilityService.start(
                 onDialogDetected: { [weak self] dialog in
-                    self?.appState.currentDialog = dialog
-                    self?.overlayWindowService.showOverlay(for: dialog)
+                    guard let self else { return }
+                    let bundleID = NSRunningApplication(processIdentifier: dialog.pid)?.bundleIdentifier
+
+                    // Per-app exclusion: leave this app's dialogs alone entirely.
+                    // PathPal's own panels (Settings' folder picker, the demo)
+                    // are handled explicitly, never via auto-detection.
+                    if let bundleID,
+                       SettingsService.shared.excludedBundleIDs.contains(bundleID)
+                        || bundleID == Bundle.main.bundleIdentifier {
+                        return
+                    }
+
+                    self.appState.currentDialog = dialog
+                    self.overlayWindowService.showOverlay(for: dialog)
+                    self.hotKeyService.setDialogActive(true)
+
+                    // Rebound: start this app's dialog in its remembered folder
+                    if SettingsService.shared.rememberFolderPerApp,
+                       let bundleID,
+                       let folder = AppFolderMemoryService.shared.folder(forBundleID: bundleID) {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                            guard let self, self.appState.currentDialog?.pid == dialog.pid else { return }
+                            self.dialogNavigationService.navigateDialog(pid: dialog.pid, toPath: folder)
+                        }
+                    }
                 },
                 onDialogDismissed: { [weak self] in
                     self?.appState.currentDialog = nil
                     self?.overlayWindowService.hideOverlay()
+                    self?.hotKeyService.setDialogActive(false)
                 }
             )
         }
@@ -168,22 +204,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
 
+        // With an Open/Save dialog up, the path bar drives the dialog instead
+        // of Finder, seeded with the dialog app's remembered folder.
+        let dialog = appState.currentDialog
+        let initialPath: String?
+        if let dialog {
+            let bundleID = NSRunningApplication(processIdentifier: dialog.pid)?.bundleIdentifier
+            initialPath = bundleID.flatMap { AppFolderMemoryService.shared.folder(forBundleID: $0) }
+        } else {
+            initialPath = PathBarService.frontFinderWindowPathViaAX() ?? appState.finderWindows.first?.path
+        }
+
+        let navigate: (String) -> Void = { [weak self] path in
+            if dialog != nil {
+                self?.overlayWindowService.navigateCurrentDialog(toPath: path)
+            } else {
+                PathBarService.navigateFinder(to: path)
+            }
+        }
+
         let panel = PathBarPanel()
         let pathBarView = PathBarView(
-            initialPath: PathBarService.frontFinderWindowPathViaAX() ?? appState.finderWindows.first?.path,
-            resolveFrontFinderPath: { completion in
+            initialPath: initialPath,
+            resolveFrontFinderPath: dialog != nil ? nil : { completion in
                 DispatchQueue.global(qos: .userInitiated).async {
                     let path = FinderScriptingService.shared.getFinderWindows().first?.path
                     DispatchQueue.main.async { completion(path) }
                 }
             },
             onNavigate: { [weak self] path in
-                PathBarService.navigateFinder(to: path)
+                navigate(path)
                 self?.pathBarPanel?.close()
                 self?.pathBarPanel = nil
             },
             onOpen: { [weak self] path, target in
-                self?.openPath(path, in: target)
+                if dialog != nil {
+                    navigate(path)
+                } else {
+                    self?.openPath(path, in: target)
+                }
                 self?.pathBarPanel?.close()
                 self?.pathBarPanel = nil
             },
@@ -197,10 +256,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             self?.pathBarPanel?.close()
             self?.pathBarPanel = nil
         }
-        panel.position(above: PathBarService.frontFinderWindowFrame())
+        panel.position(above: dialogFrameInCocoaCoords() ?? PathBarService.frontFinderWindowFrame())
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
         pathBarPanel = panel
+    }
+
+    /// Current dialog's frame converted from AX (top-left origin) to Cocoa
+    /// coordinates, for docking the path bar above it.
+    private func dialogFrameInCocoaCoords() -> NSRect? {
+        guard let dialog = appState.currentDialog,
+              let bounds = OverlayWindowService.dialogBounds(for: dialog.element) else { return nil }
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+        return NSRect(x: bounds.origin.x, y: primaryHeight - bounds.origin.y - bounds.height,
+                      width: bounds.width, height: bounds.height)
     }
 
     private func openPath(_ path: String, in target: OpenTarget) {
@@ -286,6 +355,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             self?.appState.hasCompletedOnboarding = true
             SettingsService.shared.hasCompletedOnboarding = true
             NSApp.setActivationPolicy(.accessory)
+            self?.showDemoSavePanel()
         }))
         window.center()
         window.delegate = self
@@ -294,6 +364,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
         onboardingWindow = window
+    }
+
+    /// Right after onboarding, show PathPal's own save panel so the user sees
+    /// the overlay in action within seconds of granting permissions. The
+    /// overlay is triggered explicitly (auto-detection skips our own dialogs).
+    private func showDemoSavePanel() {
+        let panel = NSSavePanel()
+        panel.message = "PathPal demo — a normal Save dialog. Use the panel beside it to jump folders, then press Cancel."
+        panel.nameFieldStringValue = "PathPal Demo.txt"
+        NSApp.activate(ignoringOtherApps: true)
+        panel.begin { [weak self] _ in
+            self?.appState.currentDialog = nil
+            self?.overlayWindowService.hideOverlay()
+            self?.hotKeyService.setDialogActive(false)
+            NSApp.setActivationPolicy(.accessory)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            guard let self, self.appState.currentDialog == nil else { return }
+            let appElement = AXUIElementCreateApplication(ProcessInfo.processInfo.processIdentifier)
+            var windowRef: CFTypeRef?
+            AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &windowRef)
+            guard let windowRef, CFGetTypeID(windowRef) == AXUIElementGetTypeID() else { return }
+            let info = DialogInfo(
+                pid: ProcessInfo.processInfo.processIdentifier,
+                element: (windowRef as! AXUIElement),
+                type: .save,
+                appName: "PathPal"
+            )
+            self.appState.currentDialog = info
+            self.overlayWindowService.showOverlay(for: info)
+            self.hotKeyService.setDialogActive(true)
+        }
     }
 
     func windowWillClose(_ notification: Notification) {

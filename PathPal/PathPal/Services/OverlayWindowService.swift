@@ -1,5 +1,13 @@
 import AppKit
 import SwiftUI
+import Combine
+
+/// Keyboard commands routed into the overlay while a dialog is up.
+enum OverlayKeyCommand {
+    case moveSelection(Int)   // +1 / -1
+    case activateSelection
+    case quickJump(Int)       // ⌃1–⌃9
+}
 
 private func debugLog(_ message: String) {
     let dir = FileManager.default.homeDirectoryForCurrentUser
@@ -24,6 +32,9 @@ final class OverlayWindowService {
     private var highlightWindows: [HighlightWindow] = []
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
+    private var keyboardTap: CFMachPort?
+    private var keyboardRunLoopSource: CFRunLoopSource?
+    let keyCommands = PassthroughSubject<OverlayKeyCommand, Never>()
     private var clickMonitor: Any?
     private var moveMonitor: Any?
     private var localMoveMonitor: Any?
@@ -64,6 +75,7 @@ final class OverlayWindowService {
 
         // Start monitors immediately; Finder windows populate asynchronously.
         startEventTap()
+        startKeyboardTap()
         startMoveMonitor()
         startDialogFrameMonitor()
 
@@ -124,6 +136,7 @@ final class OverlayWindowService {
         isShowingOverlay = false
         hideHighlightWindows()
         stopEventTap()
+        stopKeyboardTap()
         stopClickMonitorFallback()
         stopMoveMonitor()
         stopDialogFrameMonitor()
@@ -138,6 +151,7 @@ final class OverlayWindowService {
         NSHostingView(rootView: OverlayPanelView(
             finderWindows: finderWindows,
             dialogType: dialogType,
+            keyCommands: keyCommands.eraseToAnyPublisher(),
             onFolderSelected: { [weak self] path in
                 self?.navigateDialog(toPath: path)
             },
@@ -346,6 +360,89 @@ final class OverlayWindowService {
     private func navigateDialog(toPath path: String) {
         guard let dialog = currentDialog else { return }
         dialogNavigationService.navigateDialog(pid: dialog.pid, toPath: path)
+    }
+
+    /// Navigate the currently open dialog from outside the overlay (drawer
+    /// clicks, the Cmd+L path bar). Returns false when no dialog is up.
+    @discardableResult
+    func navigateCurrentDialog(toPath path: String) -> Bool {
+        guard currentDialog != nil else { return false }
+        navigateDialog(toPath: path)
+        return true
+    }
+
+    // MARK: - Keyboard Navigation Tap
+
+    /// Intercept ⌃⌥↑/⌃⌥↓/⌃⌥↩ (selection) and ⌃1–⌃9 (quick jump) while the
+    /// overlay is up. A consuming tap keyed to modifier combos the dialog's
+    /// filename field doesn't use, so normal typing is never stolen.
+    private func startKeyboardTap() {
+        stopKeyboardTap()
+
+        let eventMask: CGEventMask = (1 << CGEventType.keyDown.rawValue)
+        let selfPtr = Unmanaged.passUnretained(self).toOpaque()
+
+        guard let tap = CGEvent.tapCreate(
+            tap: .cghidEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: eventMask,
+            callback: { _, _, event, userInfo -> Unmanaged<CGEvent>? in
+                guard let userInfo else { return Unmanaged.passRetained(event) }
+                let service = Unmanaged<OverlayWindowService>.fromOpaque(userInfo).takeUnretainedValue()
+                if let command = service.keyCommand(for: event) {
+                    DispatchQueue.main.async { service.keyCommands.send(command) }
+                    return nil // consume
+                }
+                return Unmanaged.passRetained(event)
+            },
+            userInfo: selfPtr
+        ) else {
+            debugLog("[PathPal] Failed to create keyboard tap for overlay navigation")
+            return
+        }
+
+        keyboardTap = tap
+        keyboardRunLoopSource = CFMachPortCreateRunLoopSource(nil, tap, 0)
+        CFRunLoopAddSource(CFRunLoopGetMain(), keyboardRunLoopSource, .commonModes)
+        CGEvent.tapEnable(tap: tap, enable: true)
+    }
+
+    private func keyCommand(for event: CGEvent) -> OverlayKeyCommand? {
+        guard currentDialog != nil else { return nil }
+        let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+        let flags = event.flags
+        let control = flags.contains(.maskControl)
+        let option = flags.contains(.maskAlternate)
+        let command = flags.contains(.maskCommand)
+        guard control, !command else { return nil }
+
+        if option {
+            switch keyCode {
+            case 126: return .moveSelection(-1) // ⌃⌥↑
+            case 125: return .moveSelection(1)  // ⌃⌥↓
+            case 36: return .activateSelection  // ⌃⌥↩
+            default: return nil
+            }
+        }
+
+        // ⌃1–⌃9 (no option)
+        let digitKeyCodes: [Int64: Int] = [18: 1, 19: 2, 20: 3, 21: 4, 23: 5, 22: 6, 26: 7, 28: 8, 25: 9]
+        if let digit = digitKeyCodes[keyCode] {
+            return .quickJump(digit)
+        }
+        return nil
+    }
+
+    private func stopKeyboardTap() {
+        if let tap = keyboardTap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            if let source = keyboardRunLoopSource {
+                CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
+            }
+            keyboardTap = nil
+            keyboardRunLoopSource = nil
+        }
     }
 
     // MARK: - CGEvent Tap for Click Interception

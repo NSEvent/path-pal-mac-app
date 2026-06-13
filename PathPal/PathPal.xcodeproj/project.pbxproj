@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5A0001000000000000000C01 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 5A0001000000000000000C02 /* Sparkle */; };
 		A10001000000000000000001 /* PathPalApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20001000000000000000001 /* PathPalApp.swift */; };
 		A10002000000000000000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20002000000000000000002 /* AppDelegate.swift */; };
 		A10003000000000000000003 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20003000000000000000003 /* AppState.swift */; };
@@ -59,6 +60,8 @@
 		C6AEAC69B81D4235AC46F265 /* FileDrawerPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59C42AC783F34FAF97A14224 /* FileDrawerPanel.swift */; };
 		B691AD5551814A8AB9CE4A0E /* FileDrawerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 868113B37FC64B76B060065D /* FileDrawerView.swift */; };
 		9D321F3CB7AB4FA08C6ABF57 /* FileDrawerServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAD2972055624DE9AE490756 /* FileDrawerServiceTests.swift */; };
+		46153E51ED204BCF9D4E5E91 /* AppFolderMemoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 371D08C825084429B7344B8A /* AppFolderMemoryService.swift */; };
+		EF20E60CFACC4C06BCA9BF94 /* AppFolderMemoryServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14D6BE9C7654A51850103E2 /* AppFolderMemoryServiceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -151,6 +154,8 @@
 		59C42AC783F34FAF97A14224 /* FileDrawerPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDrawerPanel.swift; sourceTree = "<group>"; };
 		868113B37FC64B76B060065D /* FileDrawerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDrawerView.swift; sourceTree = "<group>"; };
 		DAD2972055624DE9AE490756 /* FileDrawerServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDrawerServiceTests.swift; sourceTree = "<group>"; };
+		371D08C825084429B7344B8A /* AppFolderMemoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFolderMemoryService.swift; sourceTree = "<group>"; };
+		D14D6BE9C7654A51850103E2 /* AppFolderMemoryServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFolderMemoryServiceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -161,6 +166,7 @@
 				A10040000000000000000040 /* ApplicationServices.framework in Frameworks */,
 				A10041000000000000000041 /* Carbon.framework in Frameworks */,
 				A10042000000000000000042 /* AppKit.framework in Frameworks */,
+				5A0001000000000000000C01 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -226,7 +232,8 @@
 				A2000E00000000000000000E /* SettingsService.swift */,
 				A2000F00000000000000000F /* PermissionsService.swift */,
 				BAE284952E77467991263479 /* FinderFavoritesService.swift */,
-				069AE50CC7D040D48D57C29E /* FileDrawerService.swift */,);
+				069AE50CC7D040D48D57C29E /* FileDrawerService.swift */,
+				371D08C825084429B7344B8A /* AppFolderMemoryService.swift */,);
 			path = Services;
 			sourceTree = "<group>";
 		};
@@ -287,7 +294,8 @@
 				55AA32B1BEB94369B00C514C /* AppStateTests.swift */,
 				2A87A2E885BC46F99AB85393 /* HighlightWindowTests.swift */,
 				30DBD1CDBB7941B4929358D4 /* FinderFavoritesServiceTests.swift */,
-				DAD2972055624DE9AE490756 /* FileDrawerServiceTests.swift */,);
+				DAD2972055624DE9AE490756 /* FileDrawerServiceTests.swift */,
+				D14D6BE9C7654A51850103E2 /* AppFolderMemoryServiceTests.swift */,);
 			path = PathPalTests;
 			sourceTree = "<group>";
 		};
@@ -340,6 +348,9 @@
 				A40003000000000000000003 /* PBXTargetDependency */,
 			);
 			name = PathPal;
+			packageProductDependencies = (
+				5A0001000000000000000C02 /* Sparkle */,
+			);
 			productName = PathPal;
 			productReference = A30001000000000000000001 /* PathPal.app */;
 			productType = "com.apple.product-type.application";
@@ -411,6 +422,9 @@
 				Base,
 			);
 			mainGroup = A80001000000000000000001;
+			packageReferences = (
+				5A0001000000000000000C03 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			productRefGroup = A8000B00000000000000000B /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -483,7 +497,9 @@
 				60D5EE5F37E34DC1A1190D97 /* HighlightLabelLayout.swift in Sources */,
 				A8A1D77D1C9B454FA1C68E00 /* FileDrawerService.swift in Sources */,
 				C6AEAC69B81D4235AC46F265 /* FileDrawerPanel.swift in Sources */,
-				B691AD5551814A8AB9CE4A0E /* FileDrawerView.swift in Sources */,);
+				B691AD5551814A8AB9CE4A0E /* FileDrawerView.swift in Sources */,
+				46153E51ED204BCF9D4E5E91 /* AppFolderMemoryService.swift in Sources */,
+);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		AA0002000000000000000002 /* Sources */ = {
@@ -503,6 +519,7 @@
 				343119790C304653891F8505 /* HighlightWindowTests.swift in Sources */,
 				083DAE2AEFC746E9B4C9435B /* FinderFavoritesServiceTests.swift in Sources */,
 				9D321F3CB7AB4FA08C6ABF57 /* FileDrawerServiceTests.swift in Sources */,
+				EF20E60CFACC4C06BCA9BF94 /* AppFolderMemoryServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -683,7 +700,8 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = PathPal/PathPal.entitlements;
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 542GXYT5Z2;
@@ -727,7 +745,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 542GXYT5Z2;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -769,7 +788,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = PathPalFinderExtension/PathPalFinderExtension.entitlements;
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 542GXYT5Z2;
 				ENABLE_APP_SANDBOX = YES;
@@ -829,6 +849,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		5A0001000000000000000C03 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.6.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		5A0001000000000000000C02 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5A0001000000000000000C03 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A50001000000000000000001 /* Project object */;
 }

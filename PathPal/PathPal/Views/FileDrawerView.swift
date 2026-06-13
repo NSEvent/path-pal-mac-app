@@ -24,37 +24,37 @@ struct FileDrawerView: View {
     )
 
     var body: some View {
+        // Always rendered at full height and pinned to the top by the hosting
+        // panel; minimizing animates the window smaller and clips the list
+        // behind the handle (no relayout = smooth roll-up).
         VStack(spacing: 0) {
             handle
 
-            if !state.isMinimized {
-                if state.items.isEmpty {
-                    emptyState
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 2) {
-                            ForEach(state.items, id: \.path) { url in
-                                itemRow(url)
-                            }
-                            .onInsert(of: [UTType.fileURL]) { index, providers in
-                                loadURLs(from: providers) { urls in
-                                    onAdd(urls, index)
-                                }
+            if state.items.isEmpty {
+                emptyState
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 2) {
+                        ForEach(state.items, id: \.path) { url in
+                            itemRow(url)
+                        }
+                        .onInsert(of: [UTType.fileURL]) { index, providers in
+                            loadURLs(from: providers) { urls in
+                                onAdd(urls, index)
                             }
                         }
-                        .padding(6)
                     }
+                    .padding(6)
                 }
             }
         }
-        .frame(width: FileDrawerPanel.drawerWidth,
-               height: state.isMinimized ? FileDrawerPanel.handleHeight : FileDrawerPanel.fullHeight)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .frame(width: FileDrawerPanel.drawerWidth, height: FileDrawerPanel.fullHeight)
+        // Faint material so the desktop/windows behind show through clearly.
+        .background(.ultraThinMaterial.opacity(0.4))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .strokeBorder(
-                    isDropTargeted ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.quaternary),
+                    isDropTargeted ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Color.white.opacity(0.15)),
                     lineWidth: isDropTargeted ? 2 : 0.5
                 )
         )

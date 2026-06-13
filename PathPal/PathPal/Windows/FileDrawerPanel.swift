@@ -62,7 +62,19 @@ final class FileDrawerPanel: NSPanel, NSDraggingSource {
         hidesOnDeactivate = false
         isReleasedWhenClosed = false
 
-        contentView = FirstMouseHostingView(rootView: rootView)
+        // A rounded, clipping container fills the window. The SwiftUI content
+        // sits inside at a FIXED full height, pinned to the top, so minimizing
+        // just animates the window (and this container) smaller — the content
+        // rolls up behind the handle and is clipped, with no SwiftUI relayout.
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: Self.drawerWidth, height: Self.fullHeight))
+        container.wantsLayer = true
+        container.layer?.cornerRadius = 12
+        container.layer?.masksToBounds = true
+        let hosting = FirstMouseHostingView(rootView: rootView)
+        hosting.frame = container.bounds
+        hosting.autoresizingMask = [.width, .minYMargin] // fixed height, pinned to top
+        container.addSubview(hosting)
+        contentView = container
 
         // Default to the right screen edge, vertically centered; remember
         // wherever the user drags it afterwards.
@@ -90,8 +102,9 @@ final class FileDrawerPanel: NSPanel, NSDraggingSource {
         newFrame.origin.y = topEdge - targetHeight // keep top fixed
         if animated {
             NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.18
-                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                context.duration = 0.28
+                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                context.allowsImplicitAnimation = true
                 animator().setFrame(newFrame, display: true)
             }
         } else {

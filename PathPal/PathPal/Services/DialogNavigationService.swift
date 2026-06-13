@@ -36,18 +36,21 @@ final class DialogNavigationService {
             )
         }
 
-        // All heavy/AX work runs after a short settle and is generation-gated,
-        // so superseded clicks return here doing essentially nothing.
+        // Activate now and let activation settle before the keystroke —
+        // activate() is async, so firing Cmd+Shift+G immediately would miss
+        // the not-yet-frontmost app. activate() is cheap and idempotent, so
+        // a superseded click calling it again is harmless; the heavy AX poll
+        // chain below is generation-gated.
+        app.activate()
+
+        // Snapshot the focused element before triggering Go to Folder
+        let systemWide = AXUIElementCreateSystemWide()
+        var preFocusedRef: CFTypeRef?
+        AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &preFocusedRef)
+        let preFocused = Self.asAXUIElement(preFocusedRef)
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             guard let self = self, self.generation == token else { return }
-
-            app.activate()
-
-            // Snapshot the focused element before triggering Go to Folder
-            let systemWide = AXUIElementCreateSystemWide()
-            var preFocusedRef: CFTypeRef?
-            AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &preFocusedRef)
-            let preFocused = Self.asAXUIElement(preFocusedRef)
 
             NSLog("[PathPal] Sending Cmd+Shift+G via HID")
             Self.postKey(code: 5, flags: [.maskCommand, .maskShift]) // G

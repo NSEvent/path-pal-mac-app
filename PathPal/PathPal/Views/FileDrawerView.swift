@@ -155,10 +155,8 @@ struct FileDrawerView: View {
         .onHover { hovering in
             hoveredItem = hovering ? url.path : (hoveredItem == url.path ? nil : hoveredItem)
         }
-        .onTapGesture {
-            let commandKey = NSEvent.modifierFlags.contains(.command)
-            onItemClick(url, commandKey)
-        }
+        // Row clicks are routed via FileDrawerPanel.sendEvent → onItemClick;
+        // SwiftUI tap gestures never fire in this never-key panel.
         .modifier(FolderDropTarget(
             isFolder: isFolder,
             isTargeted: Binding(

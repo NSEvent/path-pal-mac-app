@@ -18,6 +18,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var finderPollingTimer: Timer?
     private var onboardingWindow: NSWindow?
     private var settingsWindow: NSWindow?
+    /// PIDs whose current dialog session has already been navigated (by
+    /// rebound, the drawer, or the path bar). Re-detections of the same
+    /// dialog — e.g. the Go To Folder sheet that navigation itself opens —
+    /// must not re-trigger rebound, or it would loop / override the user's
+    /// pick. Cleared per-pid when that app's dialog is dismissed.
+    private var navigatedDialogPIDs: Set<pid_t> = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Menu bar only — no dock icon
@@ -47,9 +53,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             showOnboarding()
         }
 
-        // Drawer clicks teleport an open dialog to the clicked item
+        // Drawer clicks teleport an open dialog to the clicked item; mark the
+        // pid so rebound won't immediately override the user's pick.
         FileDrawerService.shared.dialogNavigator = { [weak self] path in
-            self?.overlayWindowService.navigateCurrentDialog(toPath: path) ?? false
+            guard let self else { return false }
+            if let pid = self.appState.currentDialog?.pid {
+                self.navigatedDialogPIDs.insert(pid)
+            }
+            return self.overlayWindowService.navigateCurrentDialog(toPath: path)
         }
 
         if SettingsService.shared.fileDrawerEnabled {
@@ -114,10 +125,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     self.overlayWindowService.showOverlay(for: dialog)
                     self.hotKeyService.setDialogActive(true)
 
-                    // Rebound: start this app's dialog in its remembered folder
+                    // Rebound: start this app's dialog in its remembered
+                    // folder — once per dialog session. The navigation opens a
+                    // Go To Folder sheet whose window-created event re-detects
+                    // the dialog; marking the pid here means that re-detection
+                    // (and any later drawer/path-bar pick) won't rebound again.
                     if SettingsService.shared.rememberFolderPerApp,
                        let bundleID,
+                       !self.navigatedDialogPIDs.contains(dialog.pid),
                        let folder = AppFolderMemoryService.shared.folder(forBundleID: bundleID) {
+                        self.navigatedDialogPIDs.insert(dialog.pid)
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                             guard let self, self.appState.currentDialog?.pid == dialog.pid else { return }
                             self.dialogNavigationService.navigateDialog(pid: dialog.pid, toPath: folder)
@@ -125,6 +142,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     }
                 },
                 onDialogDismissed: { [weak self] in
+                    if let pid = self?.appState.currentDialog?.pid {
+                        self?.navigatedDialogPIDs.remove(pid)
+                    }
                     self?.appState.currentDialog = nil
                     self?.overlayWindowService.hideOverlay()
                     self?.hotKeyService.setDialogActive(false)
@@ -216,7 +236,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
 
         let navigate: (String) -> Void = { [weak self] path in
-            if dialog != nil {
+            if let dialog {
+                self?.navigatedDialogPIDs.insert(dialog.pid)
                 self?.overlayWindowService.navigateCurrentDialog(toPath: path)
             } else {
                 PathBarService.navigateFinder(to: path)

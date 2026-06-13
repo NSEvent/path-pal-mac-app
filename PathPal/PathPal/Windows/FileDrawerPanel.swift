@@ -25,6 +25,11 @@ final class FileDrawerPanel: NSPanel, NSDraggingSource {
     private let drawerState: FileDrawerState
     private var press: (target: PressTarget, start: NSPoint)?
 
+    /// Row click handler (path, command-key). Clicks are routed here from
+    /// sendEvent because SwiftUI tap gestures don't fire in a never-key
+    /// panel; SwiftUI Buttons (remove/clear) still work via their own path.
+    var onRowClick: ((String, Bool) -> Void)?
+
     init(rootView: FileDrawerView, state: FileDrawerState) {
         drawerState = state
         super.init(
@@ -91,6 +96,24 @@ final class FileDrawerPanel: NSPanel, NSDraggingSource {
                 return // the drag (file or window) owns the gesture from here
             }
         case .leftMouseUp:
+            if let press, case .row(let path) = press.target,
+               hypot(event.locationInWindow.x - press.start.x,
+                     event.locationInWindow.y - press.start.y) <= 4,
+               let contentView,
+               let frame = drawerState.rowFrames[path] {
+                // A click (not a drag). Ignore the trailing strip where the
+                // remove button lives so its clicks aren't doubled.
+                let point = CGPoint(
+                    x: event.locationInWindow.x,
+                    y: contentView.bounds.height - event.locationInWindow.y
+                )
+                if point.x < frame.maxX - 28 {
+                    let commandKey = event.modifierFlags.contains(.command)
+                    DispatchQueue.main.async { [weak self] in
+                        self?.onRowClick?(path, commandKey)
+                    }
+                }
+            }
             press = nil
         default:
             break

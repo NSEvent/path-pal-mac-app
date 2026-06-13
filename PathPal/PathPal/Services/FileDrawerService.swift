@@ -152,6 +152,9 @@ final class FileDrawerService {
                 onItemClick: { [weak self] url, commandKey in self?.handleItemClick(url, commandKey: commandKey) },
                 onCopyInto: { [weak self] urls, folder in self?.copyFiles(urls, into: folder) }
             ), state: state)
+            panel?.onRowClick = { [weak self] path, commandKey in
+                self?.handleItemClick(URL(fileURLWithPath: path), commandKey: commandKey)
+            }
         }
         panel?.orderFrontRegardless()
         NotificationCenter.default.post(name: Self.visibilityChangedNotification, object: nil)

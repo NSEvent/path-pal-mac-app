@@ -1,16 +1,30 @@
 import Carbon
 import AppKit
 
-/// Cmd+L hotkey, armed only while Finder is frontmost.
-/// Uses Carbon RegisterEventHotKey (not an NSEvent monitor) so the keystroke
-/// is consumed — otherwise Finder also receives Cmd+L and beeps. Registering
-/// per-activation keeps Cmd+L untouched in every other app (browsers etc.).
+/// Carbon global hotkeys, armed only in the contexts where they apply so they
+/// never shadow the same keystroke elsewhere. RegisterEventHotKey (not an
+/// NSEvent monitor) consumes the keystroke, so Finder doesn't also see it and
+/// beep.
+///
+/// - **Cmd+L** — show the path bar. Armed while Finder is frontmost or an
+///   Open/Save dialog is up.
+/// - **Cmd+Return** — open (navigate into) the selected Finder folder, for
+///   keyboard-only browsing. Armed while Finder is frontmost; opt-in.
 final class HotKeyService {
-    private var hotKeyRef: EventHotKeyRef?
+    private enum HotKeyKind: UInt32 {
+        case pathBar = 1
+        case openFolder = 2
+    }
+
+    private var pathBarRef: EventHotKeyRef?
+    private var openFolderRef: EventHotKeyRef?
     private var eventHandlerRef: EventHandlerRef?
-    private var onHotKey: (() -> Void)?
+    private var onPathBar: (() -> Void)?
+    private var onOpenFolder: (() -> Void)?
     private var workspaceObservers: [NSObjectProtocol] = []
     private var dialogActive = false
+
+    private static let signature: OSType = 0x5050_414C // "PPAL"
 
     private static func debugLog(_ message: String) {
         let dir = FileManager.default.homeDirectoryForCurrentUser
@@ -28,9 +42,10 @@ final class HotKeyService {
         }
     }
 
-    func register(onHotKey: @escaping () -> Void) {
+    func register(onPathBar: @escaping () -> Void, onOpenFolder: @escaping () -> Void) {
         unregister()
-        self.onHotKey = onHotKey
+        self.onPathBar = onPathBar
+        self.onOpenFolder = onOpenFolder
 
         var eventType = EventTypeSpec(
             eventClass: OSType(kEventClassKeyboard),
@@ -38,10 +53,18 @@ final class HotKeyService {
         )
         InstallEventHandler(
             GetEventDispatcherTarget(),
-            { _, _, userData in
-                guard let userData else { return noErr }
+            { _, event, userData in
+                guard let userData, let event else { return noErr }
                 let service = Unmanaged<HotKeyService>.fromOpaque(userData).takeUnretainedValue()
-                service.onHotKey?()
+                var hotKeyID = EventHotKeyID()
+                GetEventParameter(event, EventParamName(kEventParamDirectObject),
+                                  EventParamType(typeEventHotKeyID), nil,
+                                  MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID)
+                switch HotKeyKind(rawValue: hotKeyID.id) {
+                case .pathBar: service.onPathBar?()
+                case .openFolder: service.onOpenFolder?()
+                case nil: break
+                }
                 return noErr
             },
             1, &eventType,
@@ -53,61 +76,57 @@ final class HotKeyService {
         workspaceObservers.append(nc.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
             object: nil, queue: .main
-        ) { [weak self] note in
-            let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
-            if app?.bundleIdentifier == "com.apple.finder" || self?.dialogActive == true {
-                self?.armHotKey()
-            } else {
-                self?.disarmHotKey()
-                // Transient activations (open(1), our own panels) can bounce
-                // focus straight back to Finder without a fresh didActivate
-                // event — re-check shortly so the hotkey doesn't stay dead.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    if NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.apple.finder" {
-                        self?.armHotKey()
-                    }
-                }
+        ) { [weak self] _ in
+            self?.updateArming()
+            // Transient activations (open(1), our own panels) can bounce focus
+            // straight back to Finder without a fresh didActivate event —
+            // re-check shortly so the hotkeys don't stay dead.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self?.updateArming()
             }
         })
 
-        if NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.apple.finder" {
-            armHotKey()
-        }
-        HotKeyService.debugLog("Cmd+L Carbon hotkey installed (arms when Finder is frontmost)")
+        updateArming()
+        HotKeyService.debugLog("Carbon hotkeys installed (Cmd+L, Cmd+Return)")
     }
 
     /// Arm Cmd+L while an Open/Save dialog is up in any app, so the path bar
-    /// can drive the dialog. Disarms again when the dialog closes (unless
-    /// Finder is frontmost, which keeps it armed as usual).
+    /// can drive the dialog.
     func setDialogActive(_ active: Bool) {
         dialogActive = active
-        if active {
-            armHotKey()
-        } else if NSWorkspace.shared.frontmostApplication?.bundleIdentifier != "com.apple.finder" {
-            disarmHotKey()
-        }
+        updateArming()
     }
 
-    private func armHotKey() {
-        guard hotKeyRef == nil, SettingsService.shared.pathBarHotKeyEnabled else { return }
-        let hotKeyID = EventHotKeyID(signature: OSType(0x5050_4C31), id: 1) // "PPL1"
-        let status = RegisterEventHotKey(
-            UInt32(kVK_ANSI_L), UInt32(cmdKey), hotKeyID,
-            GetEventDispatcherTarget(), 0, &hotKeyRef
-        )
-        HotKeyService.debugLog("Cmd+L armed (Finder frontmost), status \(status)")
+    /// Re-evaluate which hotkeys should be armed for the current context.
+    /// Call after any setting change too.
+    func updateArming() {
+        let finderFront = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.apple.finder"
+
+        let wantPathBar = SettingsService.shared.pathBarHotKeyEnabled && (finderFront || dialogActive)
+        setArmed(&pathBarRef, kind: .pathBar, keyCode: UInt32(kVK_ANSI_L),
+                 modifiers: UInt32(cmdKey), want: wantPathBar)
+
+        let wantOpenFolder = SettingsService.shared.finderOpenFolderHotKeyEnabled && finderFront
+        setArmed(&openFolderRef, kind: .openFolder, keyCode: UInt32(kVK_Return),
+                 modifiers: UInt32(cmdKey), want: wantOpenFolder)
     }
 
-    private func disarmHotKey() {
-        if let ref = hotKeyRef {
-            UnregisterEventHotKey(ref)
-            hotKeyRef = nil
-            HotKeyService.debugLog("Cmd+L disarmed (Finder resigned frontmost)")
+    private func setArmed(_ ref: inout EventHotKeyRef?, kind: HotKeyKind, keyCode: UInt32, modifiers: UInt32, want: Bool) {
+        if want, ref == nil {
+            let id = EventHotKeyID(signature: Self.signature, id: kind.rawValue)
+            RegisterEventHotKey(keyCode, modifiers, id, GetEventDispatcherTarget(), 0, &ref)
+        } else if !want, let existing = ref {
+            UnregisterEventHotKey(existing)
+            ref = nil
         }
     }
 
     func unregister() {
-        disarmHotKey()
+        for ref in [pathBarRef, openFolderRef].compactMap({ $0 }) {
+            UnregisterEventHotKey(ref)
+        }
+        pathBarRef = nil
+        openFolderRef = nil
         if let handler = eventHandlerRef {
             RemoveEventHandler(handler)
             eventHandlerRef = nil
@@ -115,7 +134,8 @@ final class HotKeyService {
         let nc = NSWorkspace.shared.notificationCenter
         workspaceObservers.forEach { nc.removeObserver($0) }
         workspaceObservers.removeAll()
-        onHotKey = nil
+        onPathBar = nil
+        onOpenFolder = nil
     }
 
     deinit {

@@ -163,9 +163,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             andEventID: AEEventID(kAEGetURL)
         )
 
-        hotKeyService.register { [weak self] in
-            guard SettingsService.shared.pathBarHotKeyEnabled else { return }
-            self?.showPathBar()
+        hotKeyService.register(
+            onPathBar: { [weak self] in
+                guard SettingsService.shared.pathBarHotKeyEnabled else { return }
+                self?.showPathBar()
+            },
+            onOpenFolder: {
+                guard SettingsService.shared.finderOpenFolderHotKeyEnabled else { return }
+                DispatchQueue.global(qos: .userInitiated).async {
+                    FinderScriptingService.shared.openSelectedFinderFolder()
+                }
+            }
+        )
+
+        // Re-arm hotkeys when their settings toggle
+        NotificationCenter.default.addObserver(
+            forName: .pathPalHotKeysChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.hotKeyService.updateArming()
         }
 
         // Update recent items from Finder

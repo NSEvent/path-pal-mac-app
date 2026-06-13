@@ -80,11 +80,28 @@ struct SettingsView: View {
                     }
                 }
 
-                settingsCard(icon: "command", iconColor: .orange, title: "Path Bar") {
-                    settingsToggle("Enable Cmd+L path bar (Finder only)", isOn: Binding(
-                        get: { settings.pathBarHotKeyEnabled },
-                        set: { settings.pathBarHotKeyEnabled = $0 }
-                    ))
+                settingsCard(icon: "command", iconColor: .orange, title: "Keyboard") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        settingsToggle("Cmd+L path bar (Finder & dialogs)", isOn: Binding(
+                            get: { settings.pathBarHotKeyEnabled },
+                            set: {
+                                settings.pathBarHotKeyEnabled = $0
+                                NotificationCenter.default.post(name: .pathPalHotKeysChanged, object: nil)
+                            }
+                        ))
+                        VStack(alignment: .leading, spacing: 2) {
+                            settingsToggle("Cmd+Return opens the selected folder in Finder", isOn: Binding(
+                                get: { settings.finderOpenFolderHotKeyEnabled },
+                                set: {
+                                    settings.finderOpenFolderHotKeyEnabled = $0
+                                    NotificationCenter.default.post(name: .pathPalHotKeysChanged, object: nil)
+                                }
+                            ))
+                            Text("Highlight a folder with the arrow keys, then press Cmd+Return to open it — browse without the mouse.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
 
                 settingsCard(icon: "tray.full", iconColor: .indigo, title: "File Drawer") {

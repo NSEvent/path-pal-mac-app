@@ -1,5 +1,10 @@
 import Foundation
 
+extension Notification.Name {
+    /// Posted when a hotkey-related setting changes so HotKeyService re-arms.
+    static let pathPalHotKeysChanged = Notification.Name("PathPalHotKeysChanged")
+}
+
 final class SettingsService {
     static let shared = SettingsService()
 
@@ -21,6 +26,7 @@ final class SettingsService {
         static let fileDrawerEnabled = "fileDrawerEnabled"
         static let rememberFolderPerApp = "rememberFolderPerApp"
         static let excludedBundleIDs = "excludedBundleIDs"
+        static let finderOpenFolderHotKeyEnabled = "finderOpenFolderHotKeyEnabled"
     }
 
     var launchAtLogin: Bool {
@@ -106,5 +112,11 @@ final class SettingsService {
     var excludedBundleIDs: [String] {
         get { defaults.stringArray(forKey: Keys.excludedBundleIDs) ?? [] }
         set { defaults.set(newValue, forKey: Keys.excludedBundleIDs) }
+    }
+
+    /// Cmd+Return in Finder opens (navigates into) the selected folder. Opt-in.
+    var finderOpenFolderHotKeyEnabled: Bool {
+        get { defaults.bool(forKey: Keys.finderOpenFolderHotKeyEnabled) }
+        set { defaults.set(newValue, forKey: Keys.finderOpenFolderHotKeyEnabled) }
     }
 }

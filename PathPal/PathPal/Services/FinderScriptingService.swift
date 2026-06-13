@@ -67,6 +67,24 @@ final class FinderScriptingService {
         }
     }
 
+    /// Open (navigate into) the folder currently selected in the front Finder
+    /// window, in that same window — for keyboard-only browsing via Cmd+Return.
+    /// No-op when the selection isn't a single folder.
+    func openSelectedFinderFolder() {
+        let script = """
+        tell application "Finder"
+            if (count of Finder windows) is 0 then return
+            set sel to selection
+            if (count of sel) is 0 then return
+            set theItem to item 1 of sel
+            if class of theItem is folder then
+                set target of front Finder window to theItem
+            end if
+        end tell
+        """
+        _ = runAppleScript(script)
+    }
+
     /// Navigate the front Finder window to a path.
     func navigateFinderTo(path: String) {
         let escaped = path.replacingOccurrences(of: "\"", with: "\\\"")

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Cmd+Return in Finder opens the selected folder in the same window — browse the filesystem keyboard-only (opt-in, Settings → Keyboard)
+
 ## 0.2.0 — 2026-06-12
 
 - **Rebound**: each app's dialogs auto-open in the folder you last used there; pin a folder per app in Settings to lock it

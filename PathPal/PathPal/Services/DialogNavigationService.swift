@@ -4,13 +4,24 @@ import Carbon
 
 final class DialogNavigationService {
 
+    /// Bumped on every navigation. Each polling chain captures the value at
+    /// start and stops as soon as a newer navigation begins, so rapid clicks
+    /// can't stack overlapping Cmd+Shift+G + AX-poll chains (which lagged the
+    /// target app and could freeze PathPal's main thread).
+    private var generation = 0
+
     /// Navigate an Open/Save dialog to the specified path.
     /// Uses Cmd+Shift+G to open "Go to Folder", then sets the path via Accessibility API
     /// (no clipboard manipulation, no fixed delays).
     func navigateDialog(pid: pid_t, toPath path: String) {
+        // Supersede any in-flight navigation: clicking several drawer files
+        // quickly should end at the last one, not stack 3-second poll chains
+        // (which lagged the target app and could freeze the main thread).
+        generation &+= 1
+        let token = generation
+
         NSLog("[PathPal] Navigating dialog (pid %d) to: %@", pid, path)
 
-        // Reactivate the target app so the dialog is focused
         guard let app = NSRunningApplication(processIdentifier: pid) else {
             NSLog("[PathPal] Could not find app for pid %d", pid)
             return
@@ -25,33 +36,36 @@ final class DialogNavigationService {
             )
         }
 
-        app.activate()
-        NSLog("[PathPal] Activated app: %@", app.localizedName ?? "unknown")
-
-        // Snapshot the currently focused element before triggering Go to Folder
-        let systemWide = AXUIElementCreateSystemWide()
-        var preFocusedRef: CFTypeRef?
-        AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &preFocusedRef)
-        let preFocused = Self.asAXUIElement(preFocusedRef)
-
-        // Wait for app to become active, then send Cmd+Shift+G
+        // All heavy/AX work runs after a short settle and is generation-gated,
+        // so superseded clicks return here doing essentially nothing.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            guard let self = self else { return }
+            guard let self = self, self.generation == token else { return }
+
+            app.activate()
+
+            // Snapshot the focused element before triggering Go to Folder
+            let systemWide = AXUIElementCreateSystemWide()
+            var preFocusedRef: CFTypeRef?
+            AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &preFocusedRef)
+            let preFocused = Self.asAXUIElement(preFocusedRef)
+
             NSLog("[PathPal] Sending Cmd+Shift+G via HID")
             Self.postKey(code: 5, flags: [.maskCommand, .maskShift]) // G
 
-            // Poll for the Go to Folder text field to appear
             self.pollForGoToFolderField(
                 pid: pid,
                 path: path,
                 preFocused: preFocused,
-                attempt: 0
+                attempt: 0,
+                token: token
             )
         }
     }
 
     /// Poll the AX tree to find the Go to Folder text field, then set its value.
-    private func pollForGoToFolderField(pid: pid_t, path: String, preFocused: AXUIElement?, attempt: Int) {
+    private func pollForGoToFolderField(pid: pid_t, path: String, preFocused: AXUIElement?, attempt: Int, token: Int) {
+        // Abandon if a newer navigation has superseded this one.
+        guard generation == token else { return }
         // Give up after ~3 seconds (30 attempts * 100ms)
         guard attempt < 30 else {
             NSLog("[PathPal] Timed out waiting for Go to Folder field")
@@ -105,7 +119,7 @@ final class DialogNavigationService {
 
         // Not found yet — try again in 100ms
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            self?.pollForGoToFolderField(pid: pid, path: path, preFocused: preFocused, attempt: attempt + 1)
+            self?.pollForGoToFolderField(pid: pid, path: path, preFocused: preFocused, attempt: attempt + 1, token: token)
         }
     }
 

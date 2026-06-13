@@ -17,6 +17,11 @@ final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
 /// accept. (SwiftUI `.onDrag` and embedded NSView drag sources both lose
 /// the gesture inside a movable-by-background, non-activating panel.)
 final class FileDrawerPanel: NSPanel, NSDraggingSource {
+    // Shared geometry — the SwiftUI view sizes itself to match.
+    static let drawerWidth: CGFloat = 190
+    static let fullHeight: CGFloat = 340
+    static let handleHeight: CGFloat = 44
+
     private enum PressTarget {
         case row(String)
         case background
@@ -26,23 +31,27 @@ final class FileDrawerPanel: NSPanel, NSDraggingSource {
     private var press: (target: PressTarget, start: NSPoint)?
 
     /// Row click handler (path, command-key). Clicks are routed here from
-    /// sendEvent because SwiftUI tap gestures don't fire in a never-key
-    /// panel; SwiftUI Buttons (remove/clear) still work via their own path.
+    /// sendEvent because SwiftUI tap gestures and Buttons don't fire reliably
+    /// in a never-key panel.
     var onRowClick: ((String, Bool) -> Void)?
+    /// Handle clicked (not on a control): toggle minimize.
+    var onToggleMinimize: (() -> Void)?
+    /// Clear control in the handle clicked.
+    var onClear: (() -> Void)?
 
     init(rootView: FileDrawerView, state: FileDrawerState) {
         drawerState = state
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 190, height: 320),
-            styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView],
+            contentRect: NSRect(x: 0, y: 0, width: Self.drawerWidth, height: Self.fullHeight),
+            // Borderless so the window frame equals the content exactly — no
+            // titlebar offset to confuse handle/row click coordinates.
+            styleMask: [.nonactivatingPanel, .borderless],
             backing: .buffered,
             defer: false
         )
         isFloatingPanel = true
         level = .floating
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        titleVisibility = .hidden
-        titlebarAppearsTransparent = true
         isOpaque = false
         backgroundColor = .clear
         hasShadow = true
@@ -52,9 +61,6 @@ final class FileDrawerPanel: NSPanel, NSDraggingSource {
         isMovableByWindowBackground = false
         hidesOnDeactivate = false
         isReleasedWhenClosed = false
-        standardWindowButton(.closeButton)?.isHidden = true
-        standardWindowButton(.miniaturizeButton)?.isHidden = true
-        standardWindowButton(.zoomButton)?.isHidden = true
 
         contentView = FirstMouseHostingView(rootView: rootView)
 
@@ -71,6 +77,27 @@ final class FileDrawerPanel: NSPanel, NSDraggingSource {
 
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
+
+    // MARK: - Minimize / maximize
+
+    /// Collapse to just the handle bar (or restore), keeping the handle's top
+    /// edge fixed on screen so it doesn't appear to jump.
+    func applyMinimized(_ minimized: Bool, animated: Bool) {
+        let targetHeight = minimized ? Self.handleHeight : Self.fullHeight
+        var newFrame = frame
+        let topEdge = frame.maxY
+        newFrame.size.height = targetHeight
+        newFrame.origin.y = topEdge - targetHeight // keep top fixed
+        if animated {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.18
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                animator().setFrame(newFrame, display: true)
+            }
+        } else {
+            setFrame(newFrame, display: true)
+        }
+    }
 
     // MARK: - Drag-out interception
 
@@ -96,21 +123,31 @@ final class FileDrawerPanel: NSPanel, NSDraggingSource {
                 return // the drag (file or window) owns the gesture from here
             }
         case .leftMouseUp:
-            if let press, case .row(let path) = press.target,
+            if let press,
                hypot(event.locationInWindow.x - press.start.x,
                      event.locationInWindow.y - press.start.y) <= 4,
-               let contentView,
-               let frame = drawerState.rowFrames[path] {
-                // A click (not a drag). Ignore the trailing strip where the
-                // remove button lives so its clicks aren't doubled.
+               let contentView {
                 let point = CGPoint(
                     x: event.locationInWindow.x,
                     y: contentView.bounds.height - event.locationInWindow.y
                 )
-                if point.x < frame.maxX - 28 {
-                    let commandKey = event.modifierFlags.contains(.command)
-                    DispatchQueue.main.async { [weak self] in
-                        self?.onRowClick?(path, commandKey)
+                switch press.target {
+                case .row(let path):
+                    // Ignore the trailing strip where the remove button lives.
+                    if let frame = drawerState.rowFrames[path], point.x < frame.maxX - 28 {
+                        let commandKey = event.modifierFlags.contains(.command)
+                        DispatchQueue.main.async { [weak self] in
+                            self?.onRowClick?(path, commandKey)
+                        }
+                    }
+                case .background:
+                    // A click in the handle region: clear icon, or toggle.
+                    if point.y <= Self.handleHeight {
+                        if let clear = drawerState.handleControlFrames["clear"], clear.insetBy(dx: -6, dy: -6).contains(point) {
+                            DispatchQueue.main.async { [weak self] in self?.onClear?() }
+                        } else {
+                            DispatchQueue.main.async { [weak self] in self?.onToggleMinimize?() }
+                        }
                     }
                 }
             }
@@ -130,7 +167,7 @@ final class FileDrawerPanel: NSPanel, NSDraggingSource {
             x: event.locationInWindow.x,
             y: contentView.bounds.height - event.locationInWindow.y
         )
-        guard point.y > 34 else { return nil }
+        guard point.y > Self.handleHeight else { return nil }
         return drawerState.rowFrames.first(where: { $0.value.contains(point) })?.key
     }
 

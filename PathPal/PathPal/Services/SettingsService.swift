@@ -27,6 +27,7 @@ final class SettingsService {
         static let rememberFolderPerApp = "rememberFolderPerApp"
         static let excludedBundleIDs = "excludedBundleIDs"
         static let finderOpenFolderHotKeyEnabled = "finderOpenFolderHotKeyEnabled"
+        static let fileDrawerMinimized = "fileDrawerMinimized"
     }
 
     var launchAtLogin: Bool {
@@ -118,5 +119,12 @@ final class SettingsService {
     var finderOpenFolderHotKeyEnabled: Bool {
         get { defaults.bool(forKey: Keys.finderOpenFolderHotKeyEnabled) }
         set { defaults.set(newValue, forKey: Keys.finderOpenFolderHotKeyEnabled) }
+    }
+
+    /// Whether the file drawer is collapsed to its handle. Persisted so the
+    /// chosen state survives relaunch.
+    var fileDrawerMinimized: Bool {
+        get { defaults.bool(forKey: Keys.fileDrawerMinimized) }
+        set { defaults.set(newValue, forKey: Keys.fileDrawerMinimized) }
     }
 }

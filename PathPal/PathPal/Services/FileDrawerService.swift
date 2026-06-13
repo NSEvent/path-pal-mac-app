@@ -7,9 +7,13 @@ final class FileDrawerState {
     var items: [URL] = []
     /// Cmd-click multi-selection; a drag from a selected row carries them all.
     var selectedPaths: Set<String> = []
+    /// Collapsed to just the colored handle bar when true.
+    var isMinimized: Bool = false
     /// Row frames in SwiftUI global (top-left window) coordinates, published
     /// by the view so the panel can map mouse-downs to rows for drag-out.
     @ObservationIgnored var rowFrames: [String: CGRect] = [:]
+    /// Handle-control frames (e.g. "clear") for panel-level click routing.
+    @ObservationIgnored var handleControlFrames: [String: CGRect] = [:]
 }
 
 /// A Default Folder X-style file drawer: a floating shelf users drag files
@@ -143,6 +147,7 @@ final class FileDrawerService {
 
     func show() {
         pruneMissingItems()
+        state.isMinimized = SettingsService.shared.fileDrawerMinimized
         if panel == nil {
             panel = FileDrawerPanel(rootView: FileDrawerView(
                 state: state,
@@ -155,9 +160,18 @@ final class FileDrawerService {
             panel?.onRowClick = { [weak self] path, commandKey in
                 self?.handleItemClick(URL(fileURLWithPath: path), commandKey: commandKey)
             }
+            panel?.onToggleMinimize = { [weak self] in self?.toggleMinimize() }
+            panel?.onClear = { [weak self] in self?.clear() }
         }
+        panel?.applyMinimized(state.isMinimized, animated: false)
         panel?.orderFrontRegardless()
         NotificationCenter.default.post(name: Self.visibilityChangedNotification, object: nil)
+    }
+
+    func toggleMinimize() {
+        state.isMinimized.toggle()
+        SettingsService.shared.fileDrawerMinimized = state.isMinimized
+        panel?.applyMinimized(state.isMinimized, animated: true)
     }
 
     func hide() {

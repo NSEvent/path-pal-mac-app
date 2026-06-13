@@ -16,52 +16,39 @@ struct FileDrawerView: View {
     @State private var hoveredItem: String?
     @State private var dropTargetedFolder: String?
 
+    /// Vibrant, high-visibility handle gradient.
+    private let handleGradient = LinearGradient(
+        colors: [Color(red: 0.30, green: 0.36, blue: 1.0),
+                 Color(red: 0.78, green: 0.20, blue: 0.95)],
+        startPoint: .topLeading, endPoint: .bottomTrailing
+    )
+
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack(spacing: 6) {
-                Image(systemName: "tray.full")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                Text("File Drawer")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                if !state.items.isEmpty {
-                    Button(action: onClear) {
-                        Image(systemName: "xmark.bin")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Clear all items")
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.top, 8)
-            .padding(.bottom, 6)
+            handle
 
-            Divider()
-
-            if state.items.isEmpty {
-                emptyState
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 2) {
-                        ForEach(state.items, id: \.path) { url in
-                            itemRow(url)
-                        }
-                        .onInsert(of: [UTType.fileURL]) { index, providers in
-                            loadURLs(from: providers) { urls in
-                                onAdd(urls, index)
+            if !state.isMinimized {
+                if state.items.isEmpty {
+                    emptyState
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 2) {
+                            ForEach(state.items, id: \.path) { url in
+                                itemRow(url)
+                            }
+                            .onInsert(of: [UTType.fileURL]) { index, providers in
+                                loadURLs(from: providers) { urls in
+                                    onAdd(urls, index)
+                                }
                             }
                         }
+                        .padding(6)
                     }
-                    .padding(6)
                 }
             }
         }
-        .frame(width: 190, height: 320)
+        .frame(width: FileDrawerPanel.drawerWidth,
+               height: state.isMinimized ? FileDrawerPanel.handleHeight : FileDrawerPanel.fullHeight)
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
@@ -77,6 +64,53 @@ struct FileDrawerView: View {
         .onPreferenceChange(RowFramesKey.self) { frames in
             state.rowFrames = frames
         }
+        .onPreferenceChange(HandleControlFramesKey.self) { frames in
+            state.handleControlFrames = frames
+        }
+    }
+
+    // MARK: - Vibrant handle (always visible; also the grab/move bar)
+
+    // Controls are visual only; clicks route through FileDrawerPanel.sendEvent
+    // (SwiftUI buttons don't fire reliably in this never-key panel). A click on
+    // the handle toggles minimize, a click on the clear icon clears, a drag
+    // moves the panel.
+    private var handle: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "tray.full.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white)
+            Text("File Drawer")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
+            if !state.items.isEmpty {
+                Text("\(state.items.count)")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 1)
+                    .background(Capsule().fill(.white.opacity(0.25)))
+            }
+            Spacer(minLength: 0)
+            if !state.isMinimized && !state.items.isEmpty {
+                Image(systemName: "xmark.bin.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .background(GeometryReader { geo in
+                        Color.clear.preference(key: HandleControlFramesKey.self,
+                                               value: ["clear": geo.frame(in: .global)])
+                    })
+                    .help("Clear all items")
+            }
+            Image(systemName: state.isMinimized ? "chevron.down.circle.fill" : "chevron.up.circle.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .help(state.isMinimized ? "Expand drawer" : "Minimize drawer")
+        }
+        .padding(.horizontal, 10)
+        .frame(height: FileDrawerPanel.handleHeight)
+        .frame(maxWidth: .infinity)
+        .background(handleGradient)
     }
 
     private var emptyState: some View {
@@ -239,6 +273,16 @@ private struct FolderDropTarget: ViewModifier {
 /// Row frames in SwiftUI global coordinates, keyed by file path. The panel
 /// uses these to map mouse-downs to rows for drag-out.
 struct RowFramesKey: PreferenceKey {
+    static var defaultValue: [String: CGRect] = [:]
+
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue()) { _, new in new }
+    }
+}
+
+/// Handle-control frames (e.g. "clear") in global coordinates, so the panel
+/// can route handle clicks without relying on SwiftUI button hit-testing.
+struct HandleControlFramesKey: PreferenceKey {
     static var defaultValue: [String: CGRect] = [:]
 
     static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {

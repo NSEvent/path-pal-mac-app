@@ -413,6 +413,38 @@ final class OverlayWindowServiceTests: XCTestCase {
             "Should have visible highlights for Finder windows extending outside Chrome")
     }
 
+    // MARK: - Dialog bounds always carved out (fallback when CGWindowList misses)
+
+    /// When the PID-overlap heuristic finds no windows, showHighlightWindows
+    /// still appends the dialog's own bounds (inset by -40) to the exclusions.
+    /// A Finder window covering the dialog must end up clipped around it.
+    func testDialogBoundsAloneClipCoveringFinderWindow() {
+        let dialog = CGRect(x: 558, y: 201, width: 1312, height: 687)
+        let dialogExclusion = dialog.insetBy(dx: -40, dy: -40)
+        // A big Finder window that fully spans the dialog region.
+        let finder = CGRect(x: 100, y: 100, width: 2000, height: 1200)
+
+        let regions = service.subtractRects(from: finder, excluding: [dialogExclusion])
+        for region in regions {
+            let intersection = region.intersection(dialog)
+            XCTAssertTrue(intersection.isNull || intersection.isEmpty,
+                "Region \(region) overlaps the dialog \(dialog) — dialog must never be covered")
+        }
+        // The window extends well beyond the dialog, so some highlight remains.
+        XCTAssertFalse(regions.isEmpty, "Surrounding highlight should still be visible")
+    }
+
+    func testFinderWindowInsideDialogProducesNoHighlight() {
+        let dialog = CGRect(x: 558, y: 201, width: 1312, height: 687)
+        let dialogExclusion = dialog.insetBy(dx: -40, dy: -40)
+        // A Finder window entirely within the dialog area.
+        let finder = CGRect(x: 700, y: 300, width: 400, height: 300)
+
+        let regions = service.subtractRects(from: finder, excluding: [dialogExclusion])
+        XCTAssertTrue(regions.isEmpty,
+            "A Finder window fully behind the dialog must produce no highlight, got \(regions)")
+    }
+
     func testDialogFrameNeedsRefreshForResize() {
         let previous = CGRect(x: 100, y: 100, width: 800, height: 600)
         let resized = CGRect(x: 100, y: 100, width: 900, height: 640)

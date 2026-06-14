@@ -175,6 +175,21 @@ final class OverlayWindowService {
 
         var excludeRects: [CGRect] = []
 
+        // The dialog's own bounds: prefer the tracked value, fall back to a
+        // fresh AX read. A highlight must never cover the dialog the customer
+        // is using, so if we have a dialog but can't determine where it is,
+        // skip highlights entirely rather than risk obscuring it.
+        var dialogRect = dialogBoundsCG
+        if let dialog = currentDialog, dialogRect.isEmpty {
+            dialogRect = Self.dialogBounds(for: dialog.element) ?? .zero
+        }
+        if currentDialog != nil && dialogRect.isEmpty {
+            debugLog("Skipping highlights: dialog bounds unknown (would risk covering the dialog)")
+            oldHighlightWindows.forEach { $0.orderOut(nil) }
+            hoveredFinderWindowID = nil
+            return
+        }
+
         if let dialog = currentDialog,
            let windowList = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] {
             var pidRects: [CGRect] = []
@@ -186,7 +201,16 @@ final class OverlayWindowService {
                       let w = boundsDict["Width"], let h = boundsDict["Height"] else { continue }
                 pidRects.append(CGRect(x: x, y: y, width: w, height: h))
             }
-            excludeRects = Self.dialogExclusionRects(dialogBounds: dialogBoundsCG, pidRects: pidRects)
+            excludeRects = Self.dialogExclusionRects(dialogBounds: dialogRect, pidRects: pidRects)
+        }
+
+        // Always carve out the dialog's own bounds directly. The CGWindowList
+        // PID-overlap heuristic above can miss (sheet not yet registered,
+        // unusual window structure, timing), and a highlight covering the
+        // dialog blocks the customer. The AX bounds are authoritative, so this
+        // guarantees a hole over the dialog regardless.
+        if !dialogRect.isEmpty {
+            excludeRects.append(dialogRect.insetBy(dx: -40, dy: -40))
         }
 
         // Also exclude the overlay sidebar panel

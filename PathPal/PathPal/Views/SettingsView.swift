@@ -7,7 +7,6 @@ struct SettingsView: View {
     @State private var isAutomationGranted = false
     @State private var isFullDiskAccessGranted = PermissionsService.shared.isFullDiskAccessGranted
     @State private var permissionsTimer: Timer?
-    @State private var appFolderEntries: [(bundleID: String, entry: AppFolderMemoryService.Entry)] = []
     @State private var excludedApps: [String] = []
 
     private var appVersion: String {
@@ -119,61 +118,6 @@ struct SettingsView: View {
                     }
                 }
 
-                settingsCard(icon: "arrow.uturn.backward.circle", iconColor: .teal, title: "Per-App Folders") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        settingsToggle("Open dialogs in each app's last-used folder", isOn: Binding(
-                            get: { settings.rememberFolderPerApp },
-                            set: { settings.rememberFolderPerApp = $0 }
-                        ))
-                        Text("PathPal learns where you navigate each app's dialogs. Pin an entry to lock its folder.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        if !appFolderEntries.isEmpty {
-                            Divider()
-                            ForEach(appFolderEntries, id: \.bundleID) { item in
-                                HStack(spacing: 8) {
-                                    VStack(alignment: .leading, spacing: 0) {
-                                        Text(item.entry.appName)
-                                            .font(.system(size: 12, weight: .medium))
-                                        Text(abbreviatePath(item.entry.path))
-                                            .font(.system(size: 10))
-                                            .foregroundStyle(.tertiary)
-                                            .lineLimit(1)
-                                            .truncationMode(.middle)
-                                    }
-                                    Spacer()
-                                    Button {
-                                        AppFolderMemoryService.shared.setPinned(!item.entry.pinned, forBundleID: item.bundleID)
-                                        refreshAppFolders()
-                                    } label: {
-                                        Image(systemName: item.entry.pinned ? "pin.fill" : "pin")
-                                            .foregroundStyle(item.entry.pinned ? Color.accentColor : Color.secondary)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .help(item.entry.pinned ? "Unpin (let PathPal learn again)" : "Pin this folder")
-                                    Button {
-                                        chooseFolder(for: item.bundleID)
-                                    } label: {
-                                        Image(systemName: "folder")
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .help("Choose folder…")
-                                    Button {
-                                        AppFolderMemoryService.shared.removeEntry(forBundleID: item.bundleID)
-                                        refreshAppFolders()
-                                    } label: {
-                                        Image(systemName: "xmark.circle")
-                                            .foregroundStyle(.tertiary)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .help("Forget this app")
-                                }
-                            }
-                        }
-                    }
-                }
-
                 settingsCard(icon: "nosign", iconColor: .red, title: "Excluded Apps") {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("PathPal leaves Open/Save dialogs from these apps alone.")
@@ -248,7 +192,6 @@ struct SettingsView: View {
         .frame(width: 480, height: 540)
         .onAppear {
             refreshPermissionStatuses()
-            refreshAppFolders()
             refreshExclusions()
             permissionsTimer?.invalidate()
             permissionsTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in
@@ -261,17 +204,8 @@ struct SettingsView: View {
         }
     }
 
-    private func refreshAppFolders() {
-        appFolderEntries = AppFolderMemoryService.shared.sortedEntries
-    }
-
     private func refreshExclusions() {
         excludedApps = SettingsService.shared.excludedBundleIDs
-    }
-
-    private func abbreviatePath(_ path: String) -> String {
-        let home = NSHomeDirectory()
-        return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
     }
 
     private func appDisplayName(for bundleID: String) -> String {
@@ -289,19 +223,6 @@ struct SettingsView: View {
                 return (bundleID: bundleID, name: app.localizedName ?? bundleID)
             }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-    }
-
-    private func chooseFolder(for bundleID: String) {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.prompt = "Choose"
-        if panel.runModal() == .OK, let url = panel.url {
-            AppFolderMemoryService.shared.setFolder(url.path, forBundleID: bundleID)
-            AppFolderMemoryService.shared.setPinned(true, forBundleID: bundleID)
-            refreshAppFolders()
-        }
     }
 
     private func refreshPermissionStatuses() {

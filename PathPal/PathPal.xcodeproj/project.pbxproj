@@ -60,8 +60,6 @@
 		C6AEAC69B81D4235AC46F265 /* FileDrawerPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59C42AC783F34FAF97A14224 /* FileDrawerPanel.swift */; };
 		B691AD5551814A8AB9CE4A0E /* FileDrawerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 868113B37FC64B76B060065D /* FileDrawerView.swift */; };
 		9D321F3CB7AB4FA08C6ABF57 /* FileDrawerServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAD2972055624DE9AE490756 /* FileDrawerServiceTests.swift */; };
-		46153E51ED204BCF9D4E5E91 /* AppFolderMemoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 371D08C825084429B7344B8A /* AppFolderMemoryService.swift */; };
-		EF20E60CFACC4C06BCA9BF94 /* AppFolderMemoryServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14D6BE9C7654A51850103E2 /* AppFolderMemoryServiceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -154,8 +152,6 @@
 		59C42AC783F34FAF97A14224 /* FileDrawerPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDrawerPanel.swift; sourceTree = "<group>"; };
 		868113B37FC64B76B060065D /* FileDrawerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDrawerView.swift; sourceTree = "<group>"; };
 		DAD2972055624DE9AE490756 /* FileDrawerServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDrawerServiceTests.swift; sourceTree = "<group>"; };
-		371D08C825084429B7344B8A /* AppFolderMemoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFolderMemoryService.swift; sourceTree = "<group>"; };
-		D14D6BE9C7654A51850103E2 /* AppFolderMemoryServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFolderMemoryServiceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -232,8 +228,7 @@
 				A2000E00000000000000000E /* SettingsService.swift */,
 				A2000F00000000000000000F /* PermissionsService.swift */,
 				BAE284952E77467991263479 /* FinderFavoritesService.swift */,
-				069AE50CC7D040D48D57C29E /* FileDrawerService.swift */,
-				371D08C825084429B7344B8A /* AppFolderMemoryService.swift */,);
+				069AE50CC7D040D48D57C29E /* FileDrawerService.swift */,);
 			path = Services;
 			sourceTree = "<group>";
 		};
@@ -294,8 +289,7 @@
 				55AA32B1BEB94369B00C514C /* AppStateTests.swift */,
 				2A87A2E885BC46F99AB85393 /* HighlightWindowTests.swift */,
 				30DBD1CDBB7941B4929358D4 /* FinderFavoritesServiceTests.swift */,
-				DAD2972055624DE9AE490756 /* FileDrawerServiceTests.swift */,
-				D14D6BE9C7654A51850103E2 /* AppFolderMemoryServiceTests.swift */,);
+				DAD2972055624DE9AE490756 /* FileDrawerServiceTests.swift */,);
 			path = PathPalTests;
 			sourceTree = "<group>";
 		};
@@ -498,7 +492,6 @@
 				A8A1D77D1C9B454FA1C68E00 /* FileDrawerService.swift in Sources */,
 				C6AEAC69B81D4235AC46F265 /* FileDrawerPanel.swift in Sources */,
 				B691AD5551814A8AB9CE4A0E /* FileDrawerView.swift in Sources */,
-				46153E51ED204BCF9D4E5E91 /* AppFolderMemoryService.swift in Sources */,
 );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -519,7 +512,6 @@
 				343119790C304653891F8505 /* HighlightWindowTests.swift in Sources */,
 				083DAE2AEFC746E9B4C9435B /* FinderFavoritesServiceTests.swift in Sources */,
 				9D321F3CB7AB4FA08C6ABF57 /* FileDrawerServiceTests.swift in Sources */,
-				EF20E60CFACC4C06BCA9BF94 /* AppFolderMemoryServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

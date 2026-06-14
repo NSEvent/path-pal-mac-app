@@ -27,15 +27,6 @@ final class DialogNavigationService {
             return
         }
 
-        // Learn this app's folder for rebound (auto-navigating its next dialog)
-        if SettingsService.shared.rememberFolderPerApp, let bundleID = app.bundleIdentifier {
-            AppFolderMemoryService.shared.recordNavigation(
-                toPath: path,
-                bundleID: bundleID,
-                appName: app.localizedName ?? bundleID
-            )
-        }
-
         // Activate now and let activation settle before the keystroke —
         // activate() is async, so firing Cmd+Shift+G immediately would miss
         // the not-yet-frontmost app. activate() is cheap and idempotent, so

@@ -3,10 +3,10 @@
 ## Unreleased
 
 - Cmd+Return in Finder opens the selected folder in the same window — browse the filesystem keyboard-only (opt-in, Settings → Keyboard)
+- Removed the per-app "rebound" auto-navigation feature — it was unreliable in practice. See `docs/rebound.md` for what it was and why it was pulled.
 
 ## 0.2.0 — 2026-06-12
 
-- **Rebound**: each app's dialogs auto-open in the folder you last used there; pin a folder per app in Settings to lock it
 - Keyboard navigation in the dialog overlay: ⌃⌥↑/⌃⌥↓ select, ⌃⌥↩ open, ⌃1–9 jump to Quick Access/favorites
 - Recent Files section in Open dialogs — click to select the file itself
 - File drawer: click an item while a dialog is open to teleport the dialog there; folder items accept drops (copy into folder); Cmd-click multi-select drags out as a group

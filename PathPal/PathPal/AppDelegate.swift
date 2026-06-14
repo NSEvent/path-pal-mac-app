@@ -18,12 +18,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var finderPollingTimer: Timer?
     private var onboardingWindow: NSWindow?
     private var settingsWindow: NSWindow?
-    /// PIDs whose current dialog session has already been navigated (by
-    /// rebound, the drawer, or the path bar). Re-detections of the same
-    /// dialog — e.g. the Go To Folder sheet that navigation itself opens —
-    /// must not re-trigger rebound, or it would loop / override the user's
-    /// pick. Cleared per-pid when that app's dialog is dismissed.
-    private var navigatedDialogPIDs: Set<pid_t> = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Menu bar only — no dock icon
@@ -53,14 +47,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             showOnboarding()
         }
 
-        // Drawer clicks teleport an open dialog to the clicked item; mark the
-        // pid so rebound won't immediately override the user's pick.
+        // Drawer clicks teleport an open dialog to the clicked item.
         FileDrawerService.shared.dialogNavigator = { [weak self] path in
-            guard let self else { return false }
-            if let pid = self.appState.currentDialog?.pid {
-                self.navigatedDialogPIDs.insert(pid)
-            }
-            return self.overlayWindowService.navigateCurrentDialog(toPath: path)
+            self?.overlayWindowService.navigateCurrentDialog(toPath: path) ?? false
         }
 
         if SettingsService.shared.fileDrawerEnabled {
@@ -124,27 +113,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     self.appState.currentDialog = dialog
                     self.overlayWindowService.showOverlay(for: dialog)
                     self.hotKeyService.setDialogActive(true)
-
-                    // Rebound: start this app's dialog in its remembered
-                    // folder — once per dialog session. The navigation opens a
-                    // Go To Folder sheet whose window-created event re-detects
-                    // the dialog; marking the pid here means that re-detection
-                    // (and any later drawer/path-bar pick) won't rebound again.
-                    if SettingsService.shared.rememberFolderPerApp,
-                       let bundleID,
-                       !self.navigatedDialogPIDs.contains(dialog.pid),
-                       let folder = AppFolderMemoryService.shared.folder(forBundleID: bundleID) {
-                        self.navigatedDialogPIDs.insert(dialog.pid)
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                            guard let self, self.appState.currentDialog?.pid == dialog.pid else { return }
-                            self.dialogNavigationService.navigateDialog(pid: dialog.pid, toPath: folder)
-                        }
-                    }
                 },
                 onDialogDismissed: { [weak self] in
-                    if let pid = self?.appState.currentDialog?.pid {
-                        self?.navigatedDialogPIDs.remove(pid)
-                    }
                     self?.appState.currentDialog = nil
                     self?.overlayWindowService.hideOverlay()
                     self?.hotKeyService.setDialogActive(false)
@@ -240,19 +210,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
 
         // With an Open/Save dialog up, the path bar drives the dialog instead
-        // of Finder, seeded with the dialog app's remembered folder.
+        // of Finder.
         let dialog = appState.currentDialog
         let initialPath: String?
-        if let dialog {
-            let bundleID = NSRunningApplication(processIdentifier: dialog.pid)?.bundleIdentifier
-            initialPath = bundleID.flatMap { AppFolderMemoryService.shared.folder(forBundleID: $0) }
+        if dialog != nil {
+            initialPath = nil
         } else {
             initialPath = PathBarService.frontFinderWindowPathViaAX() ?? appState.finderWindows.first?.path
         }
 
         let navigate: (String) -> Void = { [weak self] path in
-            if let dialog {
-                self?.navigatedDialogPIDs.insert(dialog.pid)
+            if dialog != nil {
                 self?.overlayWindowService.navigateCurrentDialog(toPath: path)
             } else {
                 PathBarService.navigateFinder(to: path)

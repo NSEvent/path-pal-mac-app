@@ -24,7 +24,6 @@ final class SettingsService {
         static let finderPollingInterval = "finderPollingInterval"
         static let hasCompletedOnboarding = "hasCompletedOnboarding"
         static let fileDrawerEnabled = "fileDrawerEnabled"
-        static let rememberFolderPerApp = "rememberFolderPerApp"
         static let excludedBundleIDs = "excludedBundleIDs"
         static let finderOpenFolderHotKeyEnabled = "finderOpenFolderHotKeyEnabled"
         static let fileDrawerMinimized = "fileDrawerMinimized"
@@ -102,11 +101,6 @@ final class SettingsService {
     var fileDrawerEnabled: Bool {
         get { defaults.bool(forKey: Keys.fileDrawerEnabled) }
         set { defaults.set(newValue, forKey: Keys.fileDrawerEnabled) }
-    }
-
-    var rememberFolderPerApp: Bool {
-        get { defaults.object(forKey: Keys.rememberFolderPerApp) == nil ? true : defaults.bool(forKey: Keys.rememberFolderPerApp) }
-        set { defaults.set(newValue, forKey: Keys.rememberFolderPerApp) }
     }
 
     /// Apps whose Open/Save dialogs PathPal should leave alone entirely.

@@ -100,6 +100,18 @@ struct SettingsView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
+                        VStack(alignment: .leading, spacing: 2) {
+                            settingsToggle("Backspace goes to the parent folder in Finder", isOn: Binding(
+                                get: { settings.finderBackspaceToParentEnabled },
+                                set: {
+                                    settings.finderBackspaceToParentEnabled = $0
+                                    NotificationCenter.default.post(name: .pathPalHotKeysChanged, object: nil)
+                                }
+                            ))
+                            Text("Like Windows Explorer. Ignored while renaming or searching, so it never eats a real backspace.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
 

@@ -177,11 +177,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
         )
 
-        // Re-arm hotkeys when their settings toggle
+        // Backspace-to-parent in Finder (conditional event tap)
+        FinderBackspaceService.shared.start()
+
+        // Re-arm hotkeys / refresh the Backspace tap when their settings toggle
         NotificationCenter.default.addObserver(
             forName: .pathPalHotKeysChanged, object: nil, queue: .main
         ) { [weak self] _ in
             self?.hotKeyService.updateArming()
+            FinderBackspaceService.shared.settingChanged()
         }
 
         // Update recent items from Finder

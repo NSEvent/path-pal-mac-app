@@ -26,6 +26,7 @@ final class SettingsService {
         static let fileDrawerEnabled = "fileDrawerEnabled"
         static let excludedBundleIDs = "excludedBundleIDs"
         static let finderOpenFolderHotKeyEnabled = "finderOpenFolderHotKeyEnabled"
+        static let finderBackspaceToParentEnabled = "finderBackspaceToParentEnabled"
         static let fileDrawerMinimized = "fileDrawerMinimized"
     }
 
@@ -113,6 +114,13 @@ final class SettingsService {
     var finderOpenFolderHotKeyEnabled: Bool {
         get { defaults.bool(forKey: Keys.finderOpenFolderHotKeyEnabled) }
         set { defaults.set(newValue, forKey: Keys.finderOpenFolderHotKeyEnabled) }
+    }
+
+    /// Backspace in Finder navigates to the parent folder (except while editing
+    /// text — renaming, search). Opt-in.
+    var finderBackspaceToParentEnabled: Bool {
+        get { defaults.bool(forKey: Keys.finderBackspaceToParentEnabled) }
+        set { defaults.set(newValue, forKey: Keys.finderBackspaceToParentEnabled) }
     }
 
     /// Whether the file drawer is collapsed to its handle. Persisted so the

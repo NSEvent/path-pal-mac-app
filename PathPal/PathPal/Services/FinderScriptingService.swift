@@ -98,6 +98,21 @@ final class FinderScriptingService {
         return SelectionAction(rawValue: result) ?? .none
     }
 
+    /// Navigate the front Finder window up to its parent folder (same window).
+    /// No-op with no window or when already at a container-less root.
+    func navigateToParent() {
+        let script = """
+        tell application "Finder"
+            if (count of Finder windows) is 0 then return
+            try
+                set t to target of front Finder window
+                set target of front Finder window to (container of t)
+            end try
+        end tell
+        """
+        _ = runAppleScript(script)
+    }
+
     /// Navigate the front Finder window to a path.
     func navigateFinderTo(path: String) {
         let escaped = path.replacingOccurrences(of: "\"", with: "\\\"")

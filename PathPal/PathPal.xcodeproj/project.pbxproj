@@ -60,6 +60,7 @@
 		C6AEAC69B81D4235AC46F265 /* FileDrawerPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59C42AC783F34FAF97A14224 /* FileDrawerPanel.swift */; };
 		B691AD5551814A8AB9CE4A0E /* FileDrawerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 868113B37FC64B76B060065D /* FileDrawerView.swift */; };
 		9D321F3CB7AB4FA08C6ABF57 /* FileDrawerServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAD2972055624DE9AE490756 /* FileDrawerServiceTests.swift */; };
+		203832F060184A00A37BCF37 /* FinderBackspaceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B0A64E2E9574A7A964E4D49 /* FinderBackspaceService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -152,6 +153,7 @@
 		59C42AC783F34FAF97A14224 /* FileDrawerPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDrawerPanel.swift; sourceTree = "<group>"; };
 		868113B37FC64B76B060065D /* FileDrawerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDrawerView.swift; sourceTree = "<group>"; };
 		DAD2972055624DE9AE490756 /* FileDrawerServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDrawerServiceTests.swift; sourceTree = "<group>"; };
+		5B0A64E2E9574A7A964E4D49 /* FinderBackspaceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderBackspaceService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -228,7 +230,8 @@
 				A2000E00000000000000000E /* SettingsService.swift */,
 				A2000F00000000000000000F /* PermissionsService.swift */,
 				BAE284952E77467991263479 /* FinderFavoritesService.swift */,
-				069AE50CC7D040D48D57C29E /* FileDrawerService.swift */,);
+				069AE50CC7D040D48D57C29E /* FileDrawerService.swift */,
+				5B0A64E2E9574A7A964E4D49 /* FinderBackspaceService.swift */,);
 			path = Services;
 			sourceTree = "<group>";
 		};
@@ -492,7 +495,7 @@
 				A8A1D77D1C9B454FA1C68E00 /* FileDrawerService.swift in Sources */,
 				C6AEAC69B81D4235AC46F265 /* FileDrawerPanel.swift in Sources */,
 				B691AD5551814A8AB9CE4A0E /* FileDrawerView.swift in Sources */,
-);
+				203832F060184A00A37BCF37 /* FinderBackspaceService.swift in Sources */,);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		AA0002000000000000000002 /* Sources */ = {

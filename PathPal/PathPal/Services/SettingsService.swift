@@ -27,6 +27,7 @@ final class SettingsService {
         static let excludedBundleIDs = "excludedBundleIDs"
         static let finderOpenFolderHotKeyEnabled = "finderOpenFolderHotKeyEnabled"
         static let finderBackspaceToParentEnabled = "finderBackspaceToParentEnabled"
+        static let finderRenameHotKeyEnabled = "finderRenameHotKeyEnabled"
         static let fileDrawerMinimized = "fileDrawerMinimized"
     }
 
@@ -121,6 +122,12 @@ final class SettingsService {
     var finderBackspaceToParentEnabled: Bool {
         get { defaults.bool(forKey: Keys.finderBackspaceToParentEnabled) }
         set { defaults.set(newValue, forKey: Keys.finderBackspaceToParentEnabled) }
+    }
+
+    /// F2 in Finder renames the selected item (Windows-style). Opt-in.
+    var finderRenameHotKeyEnabled: Bool {
+        get { defaults.bool(forKey: Keys.finderRenameHotKeyEnabled) }
+        set { defaults.set(newValue, forKey: Keys.finderRenameHotKeyEnabled) }
     }
 
     /// Whether the file drawer is collapsed to its handle. Persisted so the

@@ -1,4 +1,6 @@
 import Foundation
+import AppKit
+import ApplicationServices
 
 final class FinderScriptingService {
     static let shared = FinderScriptingService()
@@ -96,6 +98,28 @@ final class FinderScriptingService {
         """
         let result = runAppleScript(script) ?? "none"
         return SelectionAction(rawValue: result) ?? .none
+    }
+
+    /// Whether Finder's focused element is an editable text field (an inline
+    /// rename field or the search box). Used to avoid hijacking keys while the
+    /// user is typing. Requires Accessibility.
+    func finderFocusIsTextEditing() -> Bool {
+        guard let finder = NSRunningApplication
+            .runningApplications(withBundleIdentifier: "com.apple.finder").first else { return false }
+        let app = AXUIElementCreateApplication(finder.processIdentifier)
+        AXUIElementSetMessagingTimeout(app, 0.1)
+        var focusedRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(app, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
+              let focusedRef, CFGetTypeID(focusedRef) == AXUIElementGetTypeID() else { return false }
+        let element = focusedRef as! AXUIElement
+        var roleRef: CFTypeRef?
+        AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleRef)
+        let role = roleRef as? String ?? ""
+        var subroleRef: CFTypeRef?
+        AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &subroleRef)
+        let subrole = subroleRef as? String ?? ""
+        return role == kAXTextFieldRole || role == kAXTextAreaRole
+            || role == kAXComboBoxRole || subrole == "AXSearchField"
     }
 
     /// Navigate the front Finder window up to its parent folder (same window).

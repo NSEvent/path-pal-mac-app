@@ -10,17 +10,22 @@ import AppKit
 ///   Open/Save dialog is up.
 /// - **Cmd+Return** — open (navigate into) the selected Finder folder, for
 ///   keyboard-only browsing. Armed while Finder is frontmost; opt-in.
+/// - **F2** — rename the selected Finder item (Windows-style). Armed while
+///   Finder is frontmost; opt-in.
 final class HotKeyService {
     private enum HotKeyKind: UInt32 {
         case pathBar = 1
         case openFolder = 2
+        case renameItem = 3
     }
 
     private var pathBarRef: EventHotKeyRef?
     private var openFolderRef: EventHotKeyRef?
+    private var renameRef: EventHotKeyRef?
     private var eventHandlerRef: EventHandlerRef?
     private var onPathBar: (() -> Void)?
     private var onOpenFolder: (() -> Void)?
+    private var onRename: (() -> Void)?
     private var workspaceObservers: [NSObjectProtocol] = []
     private var dialogActive = false
 
@@ -42,10 +47,11 @@ final class HotKeyService {
         }
     }
 
-    func register(onPathBar: @escaping () -> Void, onOpenFolder: @escaping () -> Void) {
+    func register(onPathBar: @escaping () -> Void, onOpenFolder: @escaping () -> Void, onRename: @escaping () -> Void) {
         unregister()
         self.onPathBar = onPathBar
         self.onOpenFolder = onOpenFolder
+        self.onRename = onRename
 
         var eventType = EventTypeSpec(
             eventClass: OSType(kEventClassKeyboard),
@@ -63,6 +69,7 @@ final class HotKeyService {
                 switch HotKeyKind(rawValue: hotKeyID.id) {
                 case .pathBar: service.onPathBar?()
                 case .openFolder: service.onOpenFolder?()
+                case .renameItem: service.onRename?()
                 case nil: break
                 }
                 return noErr
@@ -109,6 +116,10 @@ final class HotKeyService {
         let wantOpenFolder = SettingsService.shared.finderOpenFolderHotKeyEnabled && finderFront
         setArmed(&openFolderRef, kind: .openFolder, keyCode: UInt32(kVK_Return),
                  modifiers: UInt32(cmdKey), want: wantOpenFolder)
+
+        let wantRename = SettingsService.shared.finderRenameHotKeyEnabled && finderFront
+        setArmed(&renameRef, kind: .renameItem, keyCode: UInt32(kVK_F2),
+                 modifiers: 0, want: wantRename)
     }
 
     private func setArmed(_ ref: inout EventHotKeyRef?, kind: HotKeyKind, keyCode: UInt32, modifiers: UInt32, want: Bool) {
@@ -122,11 +133,12 @@ final class HotKeyService {
     }
 
     func unregister() {
-        for ref in [pathBarRef, openFolderRef].compactMap({ $0 }) {
+        for ref in [pathBarRef, openFolderRef, renameRef].compactMap({ $0 }) {
             UnregisterEventHotKey(ref)
         }
         pathBarRef = nil
         openFolderRef = nil
+        renameRef = nil
         if let handler = eventHandlerRef {
             RemoveEventHandler(handler)
             eventHandlerRef = nil
@@ -136,6 +148,7 @@ final class HotKeyService {
         workspaceObservers.removeAll()
         onPathBar = nil
         onOpenFolder = nil
+        onRename = nil
     }
 
     deinit {

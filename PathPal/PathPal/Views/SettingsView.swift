@@ -112,6 +112,18 @@ struct SettingsView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
+                        VStack(alignment: .leading, spacing: 2) {
+                            settingsToggle("F2 renames the selected item in Finder", isOn: Binding(
+                                get: { settings.finderRenameHotKeyEnabled },
+                                set: {
+                                    settings.finderRenameHotKeyEnabled = $0
+                                    NotificationCenter.default.post(name: .pathPalHotKeysChanged, object: nil)
+                                }
+                            ))
+                            Text("Windows-style rename. Note: on Mac keyboards press Fn+F2 unless “Use F1, F2 as standard function keys” is on.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
 

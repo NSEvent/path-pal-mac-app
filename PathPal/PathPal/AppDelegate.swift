@@ -99,6 +99,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         up.post(tap: .cghidEventTap)
     }
 
+    /// Post Return to Finder to begin inline-renaming the selected item
+    /// (Finder's native rename trigger), for the F2-rename shortcut.
+    private static func postReturnToStartRename() {
+        let returnKey: CGKeyCode = 36
+        guard let down = CGEvent(keyboardEventSource: nil, virtualKey: returnKey, keyDown: true),
+              let up = CGEvent(keyboardEventSource: nil, virtualKey: returnKey, keyDown: false) else { return }
+        down.flags = []
+        up.flags = []
+        down.post(tap: .cghidEventTap)
+        up.post(tap: .cghidEventTap)
+    }
+
     private static func debugLog(_ message: String) {
         let dir = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/PathPal")
@@ -173,6 +185,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                             Self.pressSpaceForQuickLook()
                         }
                     }
+                }
+            },
+            onRename: {
+                guard SettingsService.shared.finderRenameHotKeyEnabled else { return }
+                DispatchQueue.global(qos: .userInitiated).async {
+                    // No-op if already editing text (avoid committing a rename
+                    // in progress); otherwise start the inline rename by
+                    // posting Return, Finder's native rename trigger.
+                    guard !FinderScriptingService.shared.finderFocusIsTextEditing() else { return }
+                    DispatchQueue.main.async { Self.postReturnToStartRename() }
                 }
             }
         )

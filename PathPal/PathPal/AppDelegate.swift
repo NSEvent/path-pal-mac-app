@@ -77,10 +77,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     /// Post a Space keystroke to the frontmost app (Finder) to toggle Quick
     /// Look on the selected file — the Cmd+Return-on-a-file behavior.
-    private static func pressSpaceForQuickLook() {
+    ///
+    /// The user just pressed Cmd+Return and is likely still holding Command.
+    /// If we post Space while Command is down, the OS reads it as Cmd+Space and
+    /// can trigger other apps' Cmd+Space hotkeys (Spotlight, Sol, etc.). So we
+    /// wait for Command to be released first, then post a plain Space with
+    /// explicitly-cleared modifier flags.
+    private static func pressSpaceForQuickLook(attempt: Int = 0) {
+        if NSEvent.modifierFlags.contains(.command) && attempt < 30 { // up to ~900ms
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) {
+                pressSpaceForQuickLook(attempt: attempt + 1)
+            }
+            return
+        }
         let space: CGKeyCode = 49
         guard let down = CGEvent(keyboardEventSource: nil, virtualKey: space, keyDown: true),
               let up = CGEvent(keyboardEventSource: nil, virtualKey: space, keyDown: false) else { return }
+        down.flags = []  // never inherit the still-held Command modifier
+        up.flags = []
         down.post(tap: .cghidEventTap)
         up.post(tap: .cghidEventTap)
     }

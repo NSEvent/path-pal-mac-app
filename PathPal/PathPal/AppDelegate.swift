@@ -75,6 +75,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
 
+    /// Post a Space keystroke to the frontmost app (Finder) to toggle Quick
+    /// Look on the selected file — the Cmd+Return-on-a-file behavior.
+    private static func pressSpaceForQuickLook() {
+        let space: CGKeyCode = 49
+        guard let down = CGEvent(keyboardEventSource: nil, virtualKey: space, keyDown: true),
+              let up = CGEvent(keyboardEventSource: nil, virtualKey: space, keyDown: false) else { return }
+        down.post(tap: .cghidEventTap)
+        up.post(tap: .cghidEventTap)
+    }
+
     private static func debugLog(_ message: String) {
         let dir = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/PathPal")
@@ -141,7 +151,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             onOpenFolder: {
                 guard SettingsService.shared.finderOpenFolderHotKeyEnabled else { return }
                 DispatchQueue.global(qos: .userInitiated).async {
-                    FinderScriptingService.shared.openSelectedFinderFolder()
+                    let action = FinderScriptingService.shared.actOnSelectedFinderItem()
+                    // A file: trigger Quick Look by pressing Space in Finder
+                    // (Finder is frontmost; the file is selected).
+                    if action == .file {
+                        DispatchQueue.main.async {
+                            Self.pressSpaceForQuickLook()
+                        }
+                    }
                 }
             }
         )

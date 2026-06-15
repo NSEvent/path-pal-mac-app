@@ -89,14 +89,14 @@ struct SettingsView: View {
                             }
                         ))
                         VStack(alignment: .leading, spacing: 2) {
-                            settingsToggle("Cmd+Return opens the selected folder in Finder", isOn: Binding(
+                            settingsToggle("Cmd+Return opens folders / Quick Looks files in Finder", isOn: Binding(
                                 get: { settings.finderOpenFolderHotKeyEnabled },
                                 set: {
                                     settings.finderOpenFolderHotKeyEnabled = $0
                                     NotificationCenter.default.post(name: .pathPalHotKeysChanged, object: nil)
                                 }
                             ))
-                            Text("Highlight a folder with the arrow keys, then press Cmd+Return to open it — browse without the mouse.")
+                            Text("Arrow-key to an item, then Cmd+Return: open a folder in place, or Quick Look a file — browse without the mouse.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }

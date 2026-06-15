@@ -67,22 +67,35 @@ final class FinderScriptingService {
         }
     }
 
-    /// Open (navigate into) the folder currently selected in the front Finder
-    /// window, in that same window — for keyboard-only browsing via Cmd+Return.
-    /// No-op when the selection isn't a single folder.
-    func openSelectedFinderFolder() {
+    /// Result of acting on the Finder selection for Cmd+Return.
+    enum SelectionAction: String {
+        case navigatedFolder   // selection was a folder; navigated into it
+        case file              // selection is a file; caller should Quick Look it
+        case none              // no window / no selection
+    }
+
+    /// For keyboard-only browsing via Cmd+Return: if the selected item is a
+    /// folder, navigate the front window into it (same window) and report
+    /// `.navigatedFolder`; if it's a file, report `.file` so the caller can
+    /// trigger Quick Look. Volumes/disks count as folders (navigable).
+    func actOnSelectedFinderItem() -> SelectionAction {
         let script = """
         tell application "Finder"
-            if (count of Finder windows) is 0 then return
+            if (count of Finder windows) is 0 then return "none"
             set sel to selection
-            if (count of sel) is 0 then return
+            if (count of sel) is 0 then return "none"
             set theItem to item 1 of sel
-            if class of theItem is folder then
+            set c to class of theItem
+            if c is folder or c is disk then
                 set target of front Finder window to theItem
+                return "navigatedFolder"
+            else
+                return "file"
             end if
         end tell
         """
-        _ = runAppleScript(script)
+        let result = runAppleScript(script) ?? "none"
+        return SelectionAction(rawValue: result) ?? .none
     }
 
     /// Navigate the front Finder window to a path.

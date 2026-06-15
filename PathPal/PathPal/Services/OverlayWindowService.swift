@@ -175,16 +175,19 @@ final class OverlayWindowService {
 
         var excludeRects: [CGRect] = []
 
-        // The dialog's own bounds: prefer the tracked value, fall back to a
-        // fresh AX read. A highlight must never cover the dialog the customer
-        // is using, so if we have a dialog but can't determine where it is,
-        // skip highlights entirely rather than risk obscuring it.
-        var dialogRect = dialogBoundsCG
-        if let dialog = currentDialog, dialogRect.isEmpty {
+        // The dialog's own bounds, read FRESH from AX every time — never trust
+        // the tracked dialogBoundsCG, which positionOverlay seeds with a bogus
+        // (0,0,500,400) fallback when its own AX read fails on a busy app. That
+        // bogus value would carve the hole at the screen corner and leave the
+        // real dialog covered. A highlight must never cover the dialog, so if
+        // we can't confirm where it is right now, skip highlights entirely.
+        var dialogRect = CGRect.zero
+        if let dialog = currentDialog {
             dialogRect = Self.dialogBounds(for: dialog.element) ?? .zero
+            if !dialogRect.isEmpty { dialogBoundsCG = dialogRect }
         }
         if currentDialog != nil && dialogRect.isEmpty {
-            debugLog("Skipping highlights: dialog bounds unknown (would risk covering the dialog)")
+            debugLog("Skipping highlights: dialog bounds unavailable (would risk covering the dialog)")
             oldHighlightWindows.forEach { $0.orderOut(nil) }
             hoveredFinderWindowID = nil
             return
@@ -240,8 +243,14 @@ final class OverlayWindowService {
 
         let labelFrames = HighlightLabelLayout.assignments(for: labelRegions)
 
+        // Pills are placed relative to (clipped) regions, but a fixed-size pill
+        // next to a region bordering the dialog can still spill over it. Drop
+        // any pill that would intersect the dialog.
+        let dialogPillExclusion = dialogRect.isEmpty ? CGRect.null : dialogRect.insetBy(dx: -8, dy: -8)
         for spec in highlightSpecs {
-            let windowLabelFrames = spec.labelIDs.compactMap { labelFrames[$0] }
+            let windowLabelFrames = spec.labelIDs
+                .compactMap { labelFrames[$0] }
+                .filter { dialogPillExclusion.isNull || !$0.intersects(dialogPillExclusion) }
             let hw = HighlightWindow(
                 finderWindow: spec.finderWindow,
                 colorIndex: spec.colorIndex,
@@ -872,15 +881,22 @@ final class OverlayWindowService {
     // MARK: - Overlay Positioning
 
     private func positionOverlay(_ panel: OverlayPanel, relativeTo dialog: DialogInfo) {
-        let fallbackBounds = CGRect(origin: .zero, size: CGSize(width: 500, height: 400))
-        positionOverlay(panel, dialogBounds: Self.dialogBounds(for: dialog.element) ?? fallbackBounds)
+        if let bounds = Self.dialogBounds(for: dialog.element) {
+            positionOverlay(panel, dialogBounds: bounds)
+        } else {
+            // AX read failed — position with a fallback rect but DON'T store it
+            // as dialogBoundsCG; a bogus value would mis-place the highlight
+            // exclusion and risk covering the dialog.
+            positionOverlay(panel, dialogBounds: CGRect(origin: .zero, size: CGSize(width: 500, height: 400)),
+                            storeBounds: false)
+        }
     }
 
-    private func positionOverlay(_ panel: OverlayPanel, dialogBounds: CGRect) {
+    private func positionOverlay(_ panel: OverlayPanel, dialogBounds: CGRect, storeBounds: Bool = true) {
         debugLog("positionOverlay: dialog at (\(dialogBounds.origin.x), \(dialogBounds.origin.y)) size (\(dialogBounds.width) x \(dialogBounds.height))")
 
         // Store dialog bounds in CG coords (top-left origin) for highlight clipping
-        dialogBoundsCG = dialogBounds
+        if storeBounds { dialogBoundsCG = dialogBounds }
 
         let panelWidth: CGFloat = 260
         let panelHeight: CGFloat = 400

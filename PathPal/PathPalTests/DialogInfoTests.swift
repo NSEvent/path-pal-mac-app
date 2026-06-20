@@ -1,4 +1,5 @@
 import XCTest
+import ApplicationServices
 @testable import PathPal
 
 final class DialogInfoTests: XCTestCase {
@@ -51,5 +52,46 @@ final class DialogInfoTests: XCTestCase {
         // "Open..." with an ellipsis character is not equal to "open"
         let result = DialogInfo.classify(buttonTitles: ["Open\u{2026}", "Cancel"])
         XCTAssertNil(result, "Button title with ellipsis character should not match plain 'open'")
+    }
+
+    func testRejectsThinChromeWindowCandidate() {
+        let result = DialogInfo.looksLikeDialogElement(
+            role: kAXWindowRole,
+            subrole: nil,
+            title: nil,
+            bounds: CGRect(x: -1, y: 1260, width: 491, height: 22),
+            buttonTitles: ["Cancel", "Save"]
+        )
+
+        XCTAssertFalse(result, "Thin browser UI strips must not be treated as Save dialogs")
+    }
+
+    func testAcceptsPlausibleWindowCandidateWithCancelAndSave() {
+        let result = DialogInfo.looksLikeDialogElement(
+            role: kAXWindowRole,
+            subrole: nil,
+            title: nil,
+            bounds: CGRect(x: 422, y: 449, width: 1052, height: 448),
+            buttonTitles: ["Cancel", "Save"]
+        )
+
+        XCTAssertTrue(result)
+    }
+
+    func testAcceptsSheetCandidateBeforeBoundsAreReady() {
+        let result = DialogInfo.looksLikeDialogElement(
+            role: "AXSheet",
+            subrole: nil,
+            title: nil,
+            bounds: nil,
+            buttonTitles: ["Cancel", "Save"]
+        )
+
+        XCTAssertTrue(result)
+    }
+
+    func testRejectsImplausibleDialogBounds() {
+        XCTAssertFalse(DialogInfo.isPlausibleDialogBounds(CGRect(x: -1, y: 1260, width: 491, height: 22)))
+        XCTAssertTrue(DialogInfo.isPlausibleDialogBounds(CGRect(x: 422, y: 449, width: 1052, height: 448)))
     }
 }

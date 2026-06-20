@@ -848,34 +848,7 @@ final class OverlayWindowService {
     }
 
     static func dialogBounds(for element: AXUIElement) -> CGRect? {
-        var positionValue: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &positionValue) == .success,
-              let rawPosition = positionValue,
-              CFGetTypeID(rawPosition) == AXValueGetTypeID() else {
-            return nil
-        }
-        let position = rawPosition as! AXValue
-        guard AXValueGetType(position) == .cgPoint else { return nil }
-
-        var sizeValue: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeValue) == .success,
-              let rawSize = sizeValue,
-              CFGetTypeID(rawSize) == AXValueGetTypeID() else {
-            return nil
-        }
-        let size = rawSize as! AXValue
-        guard AXValueGetType(size) == .cgSize else { return nil }
-
-        var origin = CGPoint.zero
-        var boundsSize = CGSize.zero
-        guard AXValueGetValue(position, .cgPoint, &origin),
-              AXValueGetValue(size, .cgSize, &boundsSize),
-              boundsSize.width > 0,
-              boundsSize.height > 0 else {
-            return nil
-        }
-
-        return CGRect(origin: origin, size: boundsSize)
+        DialogInfo.bounds(for: element)
     }
 
     // MARK: - Overlay Positioning

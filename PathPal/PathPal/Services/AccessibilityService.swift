@@ -24,6 +24,12 @@ final class AccessibilityService {
     private var onDialogDismissed: (() -> Void)?
     private var dialogPollingTimer: Timer?
     private var currentDialogPid: pid_t = 0
+
+    private struct DialogCandidate {
+        let element: AXUIElement
+        let type: DialogType
+    }
+
     func start(onDialogDetected: @escaping (DialogInfo) -> Void, onDialogDismissed: @escaping () -> Void) {
         self.onDialogDetected = onDialogDetected
         self.onDialogDismissed = onDialogDismissed
@@ -194,31 +200,7 @@ final class AccessibilityService {
         // If this notification was already handled by an earlier retry, skip
         if handledNotificationIDs.contains(notificationID) { return }
 
-        // Try the element itself first
-        var buttonTitles = findButtonTitles(in: element, depth: 0)
-
-        // Also check sheets attached to this window
-        if buttonTitles.isEmpty {
-            var sheets: CFTypeRef?
-            AXUIElementCopyAttributeValue(element, "AXSheets" as CFString, &sheets)
-            if let sheets = sheets as? [AXUIElement] {
-                for sheet in sheets {
-                    buttonTitles.append(contentsOf: findButtonTitles(in: sheet, depth: 0))
-                }
-            }
-        }
-
-        // Also try the focused window of this app
-        if buttonTitles.isEmpty {
-            let appElement = AXUIElementCreateApplication(pid)
-            var focusedWindow: CFTypeRef?
-            AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedWindow)
-            if let focusedWindow, CFGetTypeID(focusedWindow) == AXUIElementGetTypeID() {
-                buttonTitles = findButtonTitles(in: (focusedWindow as! AXUIElement), depth: 0)
-            }
-        }
-
-        guard let dialogType = DialogInfo.classify(buttonTitles: buttonTitles) else {
+        guard let candidate = findDialogCandidate(from: element, pid: pid) else {
             return
         }
 
@@ -226,7 +208,7 @@ final class AccessibilityService {
         handledNotificationIDs.insert(notificationID)
 
         var pidValue = pid
-        ApplicationServices.AXUIElementGetPid(element, &pidValue)
+        ApplicationServices.AXUIElementGetPid(candidate.element, &pidValue)
 
         let appName: String
         if let app = NSRunningApplication(processIdentifier: pidValue) {
@@ -235,8 +217,9 @@ final class AccessibilityService {
             appName = "Unknown"
         }
 
-        let info = DialogInfo(pid: pidValue, element: element, type: dialogType, appName: appName)
-        axDebugLog("Dialog detected: \(dialogType.rawValue) in \(appName)")
+        let info = DialogInfo(pid: pidValue, element: candidate.element, type: candidate.type, appName: appName)
+        let boundsDescription = DialogInfo.bounds(for: candidate.element).map { "\($0)" } ?? "unavailable"
+        axDebugLog("Dialog detected: \(candidate.type.rawValue) in \(appName), bounds=\(boundsDescription)")
 
         // Start polling to detect when the dialog is dismissed
         startDialogPolling(pid: pidValue)
@@ -244,6 +227,83 @@ final class AccessibilityService {
         DispatchQueue.main.async { [weak self] in
             self?.onDialogDetected?(info)
         }
+    }
+
+    private func findDialogCandidate(from element: AXUIElement, pid: pid_t) -> DialogCandidate? {
+        if let candidate = findDialogCandidate(in: element) {
+            return candidate
+        }
+
+        let appElement = AXUIElementCreateApplication(pid)
+
+        var focusedWindow: CFTypeRef?
+        AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedWindow)
+        if let focusedWindow, CFGetTypeID(focusedWindow) == AXUIElementGetTypeID(),
+           let candidate = findDialogCandidate(in: (focusedWindow as! AXUIElement)) {
+            return candidate
+        }
+
+        var windows: CFTypeRef?
+        AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windows)
+        if let windows = windows as? [AXUIElement] {
+            for window in windows {
+                if let candidate = findDialogCandidate(in: window) {
+                    return candidate
+                }
+            }
+        }
+
+        return nil
+    }
+
+    private func findDialogCandidate(in element: AXUIElement) -> DialogCandidate? {
+        if let candidate = dialogCandidateIfValid(element) {
+            return candidate
+        }
+
+        var sheets: CFTypeRef?
+        AXUIElementCopyAttributeValue(element, "AXSheets" as CFString, &sheets)
+        if let sheets = sheets as? [AXUIElement] {
+            for sheet in sheets {
+                if let candidate = dialogCandidateIfValid(sheet) {
+                    return candidate
+                }
+            }
+        }
+
+        return nil
+    }
+
+    private func dialogCandidateIfValid(_ element: AXUIElement) -> DialogCandidate? {
+        let buttonTitles = findButtonTitles(in: element, depth: 0)
+        guard let dialogType = DialogInfo.classify(buttonTitles: buttonTitles) else {
+            return nil
+        }
+
+        var role: CFTypeRef?
+        AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &role)
+        var subrole: CFTypeRef?
+        AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &subrole)
+        var title: CFTypeRef?
+        AXUIElementCopyAttributeValue(element, kAXTitleAttribute as CFString, &title)
+
+        let roleStr = role as? String
+        let subroleStr = subrole as? String
+        let titleStr = title as? String
+        let bounds = DialogInfo.bounds(for: element)
+
+        guard DialogInfo.looksLikeDialogElement(
+            role: roleStr,
+            subrole: subroleStr,
+            title: titleStr,
+            bounds: bounds,
+            buttonTitles: buttonTitles
+        ) else {
+            axDebugLog("Rejected Open/Save-like AX element: role=\(roleStr ?? "nil"), subrole=\(subroleStr ?? "nil"), title=\(titleStr ?? "nil"), bounds=\(bounds.map { "\($0)" } ?? "unavailable"), buttons=\(buttonTitles)")
+            return nil
+        }
+
+        return DialogCandidate(element: element, type: dialogType)
     }
 
     /// Poll the app to detect when its Open/Save dialog is dismissed.

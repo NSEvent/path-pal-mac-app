@@ -66,6 +66,30 @@ final class DialogInfoTests: XCTestCase {
         XCTAssertFalse(result, "Thin browser UI strips must not be treated as Save dialogs")
     }
 
+    func testRejectsThinTitleOnlyCandidate() {
+        let result = DialogInfo.looksLikeDialogElement(
+            role: kAXWindowRole,
+            subrole: nil,
+            title: "Save",
+            bounds: CGRect(x: -1, y: 1260, width: 491, height: 22),
+            buttonTitles: ["Cancel", "Save"]
+        )
+
+        XCTAssertFalse(result, "A dialog-ish title is not enough when bounds are implausible")
+    }
+
+    func testRejectsTitleOnlyCandidateWithoutBounds() {
+        let result = DialogInfo.looksLikeDialogElement(
+            role: kAXWindowRole,
+            subrole: nil,
+            title: "Open",
+            bounds: nil,
+            buttonTitles: ["Cancel", "Open"]
+        )
+
+        XCTAssertFalse(result, "A regular AXWindow must have sane bounds before it can be treated as a dialog")
+    }
+
     func testAcceptsPlausibleWindowCandidateWithCancelAndSave() {
         let result = DialogInfo.looksLikeDialogElement(
             role: kAXWindowRole,

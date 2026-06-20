@@ -42,6 +42,7 @@ final class OverlayWindowService {
     private var currentDialog: DialogInfo?
     private var overlayRequestID = 0
     private var dialogBoundsCG: CGRect = .zero  // Dialog bounds in CG coords (top-left origin)
+    private var needsHighlightRebuildAfterBoundsLoss = false
     private var finderWindows: [(name: String, path: String, bounds: CGRect)] = []
     private var hoveredFinderWindowID: CGWindowID?
     private let appState: AppState
@@ -143,6 +144,7 @@ final class OverlayWindowService {
         hideTooltip()
         currentDialog = nil
         dialogBoundsCG = .zero
+        needsHighlightRebuildAfterBoundsLoss = false
         finderWindows = []
         hoveredFinderWindowID = nil
     }
@@ -183,15 +185,17 @@ final class OverlayWindowService {
         // we can't confirm where it is right now, skip highlights entirely.
         var dialogRect = CGRect.zero
         if let dialog = currentDialog {
-            dialogRect = Self.dialogBounds(for: dialog.element) ?? .zero
+            dialogRect = Self.freshDialogBounds(for: dialog) ?? .zero
             if !dialogRect.isEmpty { dialogBoundsCG = dialogRect }
         }
         if currentDialog != nil && dialogRect.isEmpty {
             debugLog("Skipping highlights: dialog bounds unavailable (would risk covering the dialog)")
             oldHighlightWindows.forEach { $0.orderOut(nil) }
+            needsHighlightRebuildAfterBoundsLoss = true
             hoveredFinderWindowID = nil
             return
         }
+        needsHighlightRebuildAfterBoundsLoss = false
 
         if let dialog = currentDialog,
            let windowList = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] {
@@ -801,21 +805,41 @@ final class OverlayWindowService {
     }
 
     private func refreshDialogFrameIfNeeded() {
-        guard let dialog = currentDialog,
-              let newBounds = Self.dialogBounds(for: dialog.element),
-              Self.dialogFrameNeedsRefresh(previous: dialogBoundsCG, current: newBounds) else {
+        guard let dialog = currentDialog else {
             return
         }
 
-        debugLog("Dialog frame changed: \(dialogBoundsCG) -> \(newBounds)")
-        dialogBoundsCG = newBounds
-
-        if let panel = overlayPanel {
-            positionOverlay(panel, dialogBounds: newBounds)
+        guard let newBounds = Self.freshDialogBounds(for: dialog) else {
+            if !highlightWindows.isEmpty {
+                debugLog("Dialog frame unavailable; hiding Finder highlights until bounds recover")
+                hideHighlightWindows()
+            }
+            needsHighlightRebuildAfterBoundsLoss = true
+            return
         }
 
-        if SettingsService.shared.highlightFinderWindows {
+        let frameChanged = Self.dialogFrameNeedsRefresh(previous: dialogBoundsCG, current: newBounds)
+        let shouldRefreshHighlights = Self.shouldRebuildHighlightsAfterDialogFramePoll(
+            previous: dialogBoundsCG,
+            current: newBounds,
+            boundsRecoveryPending: needsHighlightRebuildAfterBoundsLoss
+        )
+
+        if frameChanged {
+            debugLog("Dialog frame changed: \(dialogBoundsCG) -> \(newBounds)")
+            dialogBoundsCG = newBounds
+
+            if let panel = overlayPanel {
+                positionOverlay(panel, dialogBounds: newBounds)
+            }
+        } else if dialogBoundsCG.isEmpty {
+            dialogBoundsCG = newBounds
+        }
+
+        if SettingsService.shared.highlightFinderWindows, shouldRefreshHighlights {
             showHighlightWindows()
+        } else {
+            needsHighlightRebuildAfterBoundsLoss = false
         }
     }
 
@@ -825,6 +849,16 @@ final class OverlayWindowService {
             || abs(previous.origin.y - current.origin.y) > tolerance
             || abs(previous.width - current.width) > tolerance
             || abs(previous.height - current.height) > tolerance
+    }
+
+    static func shouldRebuildHighlightsAfterDialogFramePoll(
+        previous: CGRect,
+        current: CGRect,
+        boundsRecoveryPending: Bool,
+        tolerance: CGFloat = 1.0
+    ) -> Bool {
+        boundsRecoveryPending
+            || dialogFrameNeedsRefresh(previous: previous, current: current, tolerance: tolerance)
     }
 
     static func finderWindowsVisuallyEqual(_ lhs: [FinderWindow], _ rhs: [FinderWindow], tolerance: CGFloat = 1.0) -> Bool {
@@ -851,10 +885,14 @@ final class OverlayWindowService {
         DialogInfo.bounds(for: element)
     }
 
+    private static func freshDialogBounds(for dialog: DialogInfo) -> CGRect? {
+        DialogInfo.candidate(inApp: dialog.pid)?.bounds
+    }
+
     // MARK: - Overlay Positioning
 
     private func positionOverlay(_ panel: OverlayPanel, relativeTo dialog: DialogInfo) {
-        if let bounds = Self.dialogBounds(for: dialog.element) {
+        if let bounds = Self.freshDialogBounds(for: dialog) ?? Self.dialogBounds(for: dialog.element) {
             positionOverlay(panel, dialogBounds: bounds)
         } else {
             // AX read failed — position with a fallback rect but DON'T store it

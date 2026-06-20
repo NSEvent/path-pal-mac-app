@@ -25,11 +25,6 @@ final class AccessibilityService {
     private var dialogPollingTimer: Timer?
     private var currentDialogPid: pid_t = 0
 
-    private struct DialogCandidate {
-        let element: AXUIElement
-        let type: DialogType
-    }
-
     func start(onDialogDetected: @escaping (DialogInfo) -> Void, onDialogDismissed: @escaping () -> Void) {
         self.onDialogDetected = onDialogDetected
         self.onDialogDismissed = onDialogDismissed
@@ -158,38 +153,15 @@ final class AccessibilityService {
             let appName = app.localizedName ?? "Unknown"
             if appName == "Finder" { continue }
 
-            let appElement = AXUIElementCreateApplication(pid)
-            var windows: CFTypeRef?
-            AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windows)
-            guard let windows = windows as? [AXUIElement] else { continue }
-
-            for window in windows {
-                // Only check windows that look like dialogs (title is "Open", "Save", etc.
-                // or subrole is AXDialog/AXSheet)
-                var subrole: CFTypeRef?
-                AXUIElementCopyAttributeValue(window, kAXSubroleAttribute as CFString, &subrole)
-                var title: CFTypeRef?
-                AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &title)
-
-                let subroleStr = subrole as? String ?? ""
-                let titleStr = (title as? String ?? "").lowercased()
-
-                let isLikelyDialog = subroleStr == "AXDialog" || subroleStr == "AXSheet"
-                    || titleStr == "open" || titleStr == "save" || titleStr == "save as"
-                    || titleStr.hasPrefix("open ") || titleStr.hasPrefix("save ")
-
-                guard isLikelyDialog else { continue }
-
-                let titles = findButtonTitles(in: window, depth: 0)
-                if let dialogType = DialogInfo.classify(buttonTitles: titles) {
-                    axDebugLog("Found existing dialog: \(dialogType.rawValue) in \(appName)")
-                    startDialogPolling(pid: pid)
-                    let info = DialogInfo(pid: pid, element: window, type: dialogType, appName: appName)
-                    DispatchQueue.main.async { [weak self] in
-                        self?.onDialogDetected?(info)
-                    }
-                    return
+            if let candidate = DialogInfo.candidate(inApp: pid) {
+                let boundsDescription = candidate.bounds.map { "\($0)" } ?? "unavailable"
+                axDebugLog("Found existing dialog: \(candidate.type.rawValue) in \(appName), bounds=\(boundsDescription)")
+                startDialogPolling(pid: pid)
+                let info = DialogInfo(pid: pid, element: candidate.element, type: candidate.type, appName: appName)
+                DispatchQueue.main.async { [weak self] in
+                    self?.onDialogDetected?(info)
                 }
+                return
             }
         }
     }
@@ -200,7 +172,7 @@ final class AccessibilityService {
         // If this notification was already handled by an earlier retry, skip
         if handledNotificationIDs.contains(notificationID) { return }
 
-        guard let candidate = findDialogCandidate(from: element, pid: pid) else {
+        guard let candidate = DialogInfo.candidate(from: element, pid: pid) else {
             return
         }
 
@@ -218,7 +190,7 @@ final class AccessibilityService {
         }
 
         let info = DialogInfo(pid: pidValue, element: candidate.element, type: candidate.type, appName: appName)
-        let boundsDescription = DialogInfo.bounds(for: candidate.element).map { "\($0)" } ?? "unavailable"
+        let boundsDescription = candidate.bounds.map { "\($0)" } ?? "unavailable"
         axDebugLog("Dialog detected: \(candidate.type.rawValue) in \(appName), bounds=\(boundsDescription)")
 
         // Start polling to detect when the dialog is dismissed
@@ -227,83 +199,6 @@ final class AccessibilityService {
         DispatchQueue.main.async { [weak self] in
             self?.onDialogDetected?(info)
         }
-    }
-
-    private func findDialogCandidate(from element: AXUIElement, pid: pid_t) -> DialogCandidate? {
-        if let candidate = findDialogCandidate(in: element) {
-            return candidate
-        }
-
-        let appElement = AXUIElementCreateApplication(pid)
-
-        var focusedWindow: CFTypeRef?
-        AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedWindow)
-        if let focusedWindow, CFGetTypeID(focusedWindow) == AXUIElementGetTypeID(),
-           let candidate = findDialogCandidate(in: (focusedWindow as! AXUIElement)) {
-            return candidate
-        }
-
-        var windows: CFTypeRef?
-        AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windows)
-        if let windows = windows as? [AXUIElement] {
-            for window in windows {
-                if let candidate = findDialogCandidate(in: window) {
-                    return candidate
-                }
-            }
-        }
-
-        return nil
-    }
-
-    private func findDialogCandidate(in element: AXUIElement) -> DialogCandidate? {
-        if let candidate = dialogCandidateIfValid(element) {
-            return candidate
-        }
-
-        var sheets: CFTypeRef?
-        AXUIElementCopyAttributeValue(element, "AXSheets" as CFString, &sheets)
-        if let sheets = sheets as? [AXUIElement] {
-            for sheet in sheets {
-                if let candidate = dialogCandidateIfValid(sheet) {
-                    return candidate
-                }
-            }
-        }
-
-        return nil
-    }
-
-    private func dialogCandidateIfValid(_ element: AXUIElement) -> DialogCandidate? {
-        let buttonTitles = findButtonTitles(in: element, depth: 0)
-        guard let dialogType = DialogInfo.classify(buttonTitles: buttonTitles) else {
-            return nil
-        }
-
-        var role: CFTypeRef?
-        AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &role)
-        var subrole: CFTypeRef?
-        AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &subrole)
-        var title: CFTypeRef?
-        AXUIElementCopyAttributeValue(element, kAXTitleAttribute as CFString, &title)
-
-        let roleStr = role as? String
-        let subroleStr = subrole as? String
-        let titleStr = title as? String
-        let bounds = DialogInfo.bounds(for: element)
-
-        guard DialogInfo.looksLikeDialogElement(
-            role: roleStr,
-            subrole: subroleStr,
-            title: titleStr,
-            bounds: bounds,
-            buttonTitles: buttonTitles
-        ) else {
-            axDebugLog("Rejected Open/Save-like AX element: role=\(roleStr ?? "nil"), subrole=\(subroleStr ?? "nil"), title=\(titleStr ?? "nil"), bounds=\(bounds.map { "\($0)" } ?? "unavailable"), buttons=\(buttonTitles)")
-            return nil
-        }
-
-        return DialogCandidate(element: element, type: dialogType)
     }
 
     /// Poll the app to detect when its Open/Save dialog is dismissed.
@@ -315,21 +210,8 @@ final class AccessibilityService {
         dialogPollingTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             guard let self = self, self.currentDialogPid != 0 else { return }
 
-            // Check if the app still has a dialog open by scanning its windows
-            let appElement = AXUIElementCreateApplication(self.currentDialogPid)
-            var windows: CFTypeRef?
-            AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windows)
-
-            var dialogStillOpen = false
-            if let windows = windows as? [AXUIElement] {
-                for window in windows {
-                    let titles = self.findButtonTitles(in: window, depth: 0)
-                    if DialogInfo.classify(buttonTitles: titles) != nil {
-                        dialogStillOpen = true
-                        break
-                    }
-                }
-            }
+            // Use the same strict candidate resolver as initial detection.
+            let dialogStillOpen = DialogInfo.candidate(inApp: self.currentDialogPid) != nil
 
             if !dialogStillOpen {
                 axDebugLog("Dialog polling: no dialog found in pid \(self.currentDialogPid), dismissing")
@@ -342,41 +224,4 @@ final class AccessibilityService {
         }
     }
 
-    private func findButtonTitles(in element: AXUIElement, depth: Int = 0) -> [String] {
-        guard depth < 10 else { return [] }
-
-        var titles: [String] = []
-        var role: CFTypeRef?
-        AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &role)
-        let roleStr = role as? String
-
-        // Found a button — grab its title
-        if roleStr == kAXButtonRole {
-            var title: CFTypeRef?
-            AXUIElementCopyAttributeValue(element, kAXTitleAttribute as CFString, &title)
-            if let title = title as? String, !title.isEmpty {
-                titles.append(title)
-            }
-            return titles
-        }
-
-        // Skip content containers that can be huge (file lists, tables, etc.)
-        let skipRoles: Set<String> = [
-            kAXScrollAreaRole, kAXTableRole, kAXOutlineRole, kAXListRole,
-            kAXBrowserRole, "AXWebArea"
-        ]
-        if let roleStr = roleStr, skipRoles.contains(roleStr) {
-            return []
-        }
-
-        var children: CFTypeRef?
-        AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &children)
-        if let children = children as? [AXUIElement] {
-            for child in children {
-                titles.append(contentsOf: findButtonTitles(in: child, depth: depth + 1))
-            }
-        }
-
-        return titles
-    }
 }

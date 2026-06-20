@@ -465,4 +465,24 @@ final class OverlayWindowServiceTests: XCTestCase {
 
         XCTAssertFalse(OverlayWindowService.dialogFrameNeedsRefresh(previous: previous, current: noisy))
     }
+
+    func testHighlightRefreshNeededAfterBoundsRecoveryEvenWhenFrameUnchanged() {
+        let frame = CGRect(x: 100, y: 100, width: 800, height: 600)
+
+        XCTAssertTrue(OverlayWindowService.shouldRebuildHighlightsAfterDialogFramePoll(
+            previous: frame,
+            current: frame,
+            boundsRecoveryPending: true
+        ))
+    }
+
+    func testHighlightRefreshNotNeededForStableFrameWithoutBoundsRecovery() {
+        let frame = CGRect(x: 100, y: 100, width: 800, height: 600)
+
+        XCTAssertFalse(OverlayWindowService.shouldRebuildHighlightsAfterDialogFramePoll(
+            previous: frame,
+            current: frame,
+            boundsRecoveryPending: false
+        ))
+    }
 }

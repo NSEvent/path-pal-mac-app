@@ -146,6 +146,11 @@ final class FileDrawerService {
     var isVisible: Bool { panel?.isVisible ?? false }
 
     func show() {
+        guard SettingsService.shared.fileDrawerEnabled else {
+            hide()
+            return
+        }
+
         pruneMissingItems()
         state.isMinimized = SettingsService.shared.fileDrawerMinimized
         if panel == nil {
@@ -185,6 +190,7 @@ final class FileDrawerService {
 
     /// Settings toggle hook: the drawer exists while the feature is enabled.
     func setEnabled(_ enabled: Bool) {
+        SettingsService.shared.fileDrawerEnabled = enabled
         enabled ? show() : hide()
     }
 }

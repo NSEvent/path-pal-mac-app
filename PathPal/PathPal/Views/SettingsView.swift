@@ -132,7 +132,6 @@ struct SettingsView: View {
                         settingsToggle("Enable file drawer", isOn: Binding(
                             get: { settings.fileDrawerEnabled },
                             set: {
-                                settings.fileDrawerEnabled = $0
                                 FileDrawerService.shared.setEnabled($0)
                             }
                         ))

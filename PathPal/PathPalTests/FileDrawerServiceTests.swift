@@ -3,15 +3,22 @@ import XCTest
 
 final class FileDrawerServiceTests: XCTestCase {
     var tempDir: URL!
+    private var originalFileDrawerEnabled: Any?
 
     override func setUpWithError() throws {
         tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("FileDrawerTests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        originalFileDrawerEnabled = UserDefaults.standard.object(forKey: "fileDrawerEnabled")
     }
 
     override func tearDownWithError() throws {
         try? FileManager.default.removeItem(at: tempDir)
+        if let originalFileDrawerEnabled {
+            UserDefaults.standard.set(originalFileDrawerEnabled, forKey: "fileDrawerEnabled")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "fileDrawerEnabled")
+        }
     }
 
     private func makeFile(_ name: String) throws -> URL {
@@ -117,5 +124,23 @@ final class FileDrawerServiceTests: XCTestCase {
         try FileManager.default.removeItem(at: b)
         service.pruneMissingItems()
         XCTAssertEqual(service.state.items.map(\.lastPathComponent), ["a.txt"])
+    }
+
+    func testShowDoesNotOpenDrawerWhenDisabled() {
+        UserDefaults.standard.set(false, forKey: "fileDrawerEnabled")
+        let service = FileDrawerService(storageDirectory: tempDir)
+
+        service.show()
+
+        XCTAssertFalse(service.isVisible)
+    }
+
+    func testToggleVisibilityDoesNotOpenDrawerWhenDisabled() {
+        UserDefaults.standard.set(false, forKey: "fileDrawerEnabled")
+        let service = FileDrawerService(storageDirectory: tempDir)
+
+        service.toggleVisibility()
+
+        XCTAssertFalse(service.isVisible)
     }
 }

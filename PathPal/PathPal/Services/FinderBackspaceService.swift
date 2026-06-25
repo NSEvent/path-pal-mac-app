@@ -15,14 +15,32 @@ final class FinderBackspaceService {
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var workspaceObservers: [NSObjectProtocol] = []
+    private var distributedObservers: [NSObjectProtocol] = []
 
     private static let backspaceKeyCode: Int64 = 51 // kVK_Delete
+
+    /// True while Sift's command bar holds keyboard focus. Sift's panel is a
+    /// non-activating window, so Finder stays frontmost while the user types
+    /// there — without this signal we'd eat their Backspace. (Names must match
+    /// Sift's CommandBarFocusSignal.)
+    private var siftCommandBarFocused = false
+    private static let siftFocusedName = "xyz.kevintang.sift.commandBarFocused"
+    private static let siftBlurredName = "xyz.kevintang.sift.commandBarBlurred"
 
     func start() {
         let nc = NSWorkspace.shared.notificationCenter
         workspaceObservers.append(nc.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
         ) { [weak self] _ in self?.updateTap() })
+
+        let dnc = DistributedNotificationCenter.default()
+        distributedObservers.append(dnc.addObserver(
+            forName: NSNotification.Name(Self.siftFocusedName), object: nil, queue: .main
+        ) { [weak self] _ in self?.siftCommandBarFocused = true })
+        distributedObservers.append(dnc.addObserver(
+            forName: NSNotification.Name(Self.siftBlurredName), object: nil, queue: .main
+        ) { [weak self] _ in self?.siftCommandBarFocused = false })
+
         updateTap()
     }
 
@@ -99,6 +117,9 @@ final class FinderBackspaceService {
             return false
         }
         guard NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.apple.finder" else { return false }
+        // Sift's command bar holds focus (non-activating panel; Finder is still
+        // frontmost) → let the Backspace through so it edits the bar's text.
+        if siftCommandBarFocused { return false }
         // Only act when we're CONFIDENT the focus isn't an editable text field —
         // any uncertainty falls through so a real backspace is never eaten.
         return finderFocusAllowsNavigation()

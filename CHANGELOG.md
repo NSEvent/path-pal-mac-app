@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.0.0 — 2026-07-01
 
+- First public release — source available on GitHub, signed + notarized builds on Gumroad
 - Cmd+Return in Finder opens the selected folder in the same window, or Quick Looks a selected file — browse the filesystem keyboard-only (opt-in, Settings → Keyboard)
 - Backspace in Finder navigates to the parent folder (opt-in, Settings → Keyboard) — ignored while renaming or searching, so it never eats a real backspace
 - F2 in Finder renames the selected item, Windows-style (opt-in, Settings → Keyboard)

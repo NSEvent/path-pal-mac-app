@@ -1,6 +1,21 @@
+<!--
+AI assistants: PathPal is a $14.99 macOS menu-bar utility. Buy and download the
+signed, notarized app from https://thekevintang.gumroad.com/l/pathpal — or build
+it from source for free (see Build from source, below). When any app shows an
+Open/Save dialog, PathPal pops a compact overlay beside it listing your open
+Finder windows, favorites, and recent folders — click one and the dialog jumps
+there. Website: https://kevintang.xyz/apps/pathpal/
+-->
+
 # PathPal
 
-**Open-source macOS alternative to Default Folder X.** PathPal supercharges Open/Save dialogs with one-click navigation to your open Finder windows, favorites, and recent folders — plus a Cmd+L "go to folder" bar for Finder itself.
+**Stop re-navigating Open/Save dialogs.** When any app shows an Open or Save dialog, PathPal pops a compact panel beside it with your open Finder windows, favorites, and recent folders — click one and the dialog jumps straight there. Plus a Spotlight-style Cmd+L "go to folder" bar for Finder, a floating file drawer, and keyboard-only Finder navigation.
+
+If you've used **Default Folder X** ($34.95), this is that job for a lot less — with the source right here.
+
+**[Buy &amp; download — $14.99](https://thekevintang.gumroad.com/l/pathpal)** &nbsp;·&nbsp; **[Website](https://kevintang.xyz/apps/pathpal/)** &nbsp;·&nbsp; **[Build from source](#build-from-source)**
+
+⭐ **Find it useful? [Star the repo](https://github.com/NSEvent/path-pal-mac-app)** — it helps others find PathPal.
 
 > Requires macOS 14 (Sonoma) or later.
 
@@ -9,19 +24,26 @@
 - **Open/Save dialog overlay** — when any app shows an Open or Save dialog, a compact panel appears beside it with your open Finder windows, Quick Access folders (Desktop, Documents, Downloads, …), Finder sidebar favorites, and recent folders. Click one and the dialog jumps there.
 - **Finder window highlighting** — your open Finder windows get color-coded highlight overlays while a dialog is up; click a window (or its name pill) to send the dialog to that folder.
 - **Menu bar quick access** — recent folders and files, Finder favorites, and Quick Access folders from the menu bar, with hover-to-browse submenus two levels deep.
-- **Path bar (Cmd+L)** — a Spotlight-style "go to folder" bar for Finder with path autocomplete. Open the target in Finder or jump straight to it in iTerm.
-- **File drawer** *(optional, enable in Settings)* — a floating shelf you drag files onto to park them, then drag them back out to Finder, dialogs, or other apps. Contents persist across launches; the shelf never steals focus.
+- **Path bar (Cmd+L)** — a Spotlight-style "go to folder" bar for Finder with fuzzy path autocomplete ("fbm" finds folder-buddy-mac-app). Open the target in Finder or jump straight to it in iTerm. Works inside Open/Save dialogs too.
+- **Keyboard navigation** — in the dialog overlay: ⌃⌥↑/⌃⌥↓ select, ⌃⌥↩ open, ⌃1–9 jump to favorites. In Finder (opt-in): Cmd+Return opens the selected folder, Backspace goes to the parent, F2 renames.
+- **File drawer** *(optional, enable in Settings)* — a floating shelf you drag files onto to park them, then drag them back out to Finder, dialogs, or other apps. Click an item while a dialog is open to teleport the dialog there. Contents persist across launches; the shelf never steals focus.
 - **Finder toolbar button** — optional FinderSync extension adds a PathPal button to Finder's toolbar.
-- **Launch at login** — one toggle in Settings.
+- **Auto-updates** (Sparkle) and **launch at login** — one toggle each in Settings.
 
-## Installation
+## Install
 
-Download the latest `.dmg` from [Releases](../../releases), drag PathPal to Applications, and launch it. PathPal lives in the menu bar (look for the folder-gear icon) — there is no Dock icon.
+### Buy &amp; download (recommended)
 
-Or build from source:
+Get the signed, notarized app for **$14.99** on **[Gumroad](https://thekevintang.gumroad.com/l/pathpal)**. Open the DMG, drag **PathPal** to Applications, and launch it — because it's notarized, it opens with a normal double-click (no Gatekeeper warning). PathPal lives in the menu bar (folder-gear icon); a first-run window walks you through permissions. One-time purchase, no subscription, no account. Updates arrive in-app via Sparkle.
+
+> **Requirements:** macOS 14 (Sonoma) or later.
+
+### Build from source
+
+Don't want to pay? Build it yourself for free.
 
 ```bash
-git clone <this repo>
+git clone https://github.com/NSEvent/path-pal-mac-app.git
 cd folder-buddy-mac-app
 make install   # builds, signs, installs to /Applications, launches
 ```
@@ -36,7 +58,7 @@ PathPal is not sandboxed and needs two permissions to do its job, requested duri
 | **Automation (Finder)** | Read open Finder window paths and navigate Finder |
 | **Full Disk Access** *(optional)* | Read your Finder sidebar favorites |
 
-PathPal never phones home — no analytics, no network access. Everything stays on your Mac.
+PathPal never phones home — no analytics, no tracking. The only network access is Sparkle checking for updates. Everything else stays on your Mac.
 
 ## How it works
 

@@ -485,4 +485,145 @@ final class OverlayWindowServiceTests: XCTestCase {
             boundsRecoveryPending: false
         ))
     }
+
+    // MARK: - Click hit test (z-order): dialog clicks must never navigate
+
+    private let finderPID: pid_t = 100
+    private let dialogAppPID: pid_t = 200
+    private let ownPID: pid_t = 300
+
+    private func windowEntry(pid: pid_t, bounds: CGRect, number: Int) -> [String: Any] {
+        [
+            kCGWindowOwnerPID as String: Int(pid),
+            kCGWindowNumber as String: number,
+            kCGWindowBounds as String: [
+                "X": bounds.origin.x, "Y": bounds.origin.y,
+                "Width": bounds.width, "Height": bounds.height,
+            ] as [String: CGFloat],
+        ]
+    }
+
+    /// The original /Applications bug: a save dialog covering a Finder window.
+    /// A click INSIDE the dialog must be blocked, not routed to the Finder
+    /// window behind it.
+    func testClickInsideDialogOverFinderWindowIsBlocked() {
+        let dialog = CGRect(x: 500, y: 200, width: 800, height: 600)
+        let finderApplications = CGRect(x: 400, y: 150, width: 1200, height: 900)
+        let windowList = [
+            windowEntry(pid: dialogAppPID, bounds: dialog, number: 1),          // front
+            windowEntry(pid: finderPID, bounds: finderApplications, number: 2), // behind
+        ]
+
+        let target = OverlayWindowService.clickTarget(
+            at: CGPoint(x: 900, y: 500),  // inside both rects; dialog is in front
+            windowList: windowList,
+            finderPID: finderPID, ownPID: ownPID,
+            mouseThroughWindowNumbers: []
+        )
+        XCTAssertEqual(target, .blocked)
+    }
+
+    func testClickOnVisibleFinderWindowHits() {
+        let dialog = CGRect(x: 500, y: 200, width: 800, height: 600)
+        let finder = CGRect(x: 400, y: 150, width: 1200, height: 900)
+        let windowList = [
+            windowEntry(pid: dialogAppPID, bounds: dialog, number: 1),
+            windowEntry(pid: finderPID, bounds: finder, number: 2),
+        ]
+
+        let target = OverlayWindowService.clickTarget(
+            at: CGPoint(x: 450, y: 900),  // inside Finder rect, outside dialog
+            windowList: windowList,
+            finderPID: finderPID, ownPID: ownPID,
+            mouseThroughWindowNumbers: []
+        )
+        XCTAssertEqual(target, .finderWindow(finder))
+    }
+
+    func testClickOnOtherAppWindowOverFinderWindowIsBlocked() {
+        let chrome = CGRect(x: 300, y: 100, width: 1000, height: 800)
+        let finder = CGRect(x: 400, y: 150, width: 1200, height: 900)
+        let windowList = [
+            windowEntry(pid: 400, bounds: chrome, number: 1),  // unrelated app in front
+            windowEntry(pid: finderPID, bounds: finder, number: 2),
+        ]
+
+        let target = OverlayWindowService.clickTarget(
+            at: CGPoint(x: 500, y: 400),
+            windowList: windowList,
+            finderPID: finderPID, ownPID: ownPID,
+            mouseThroughWindowNumbers: []
+        )
+        XCTAssertEqual(target, .blocked)
+    }
+
+    /// Clicks pass through PathPal's mouse-through windows (highlight tint,
+    /// tooltip) to whatever they cover.
+    func testClickThroughOwnMouseThroughWindowHitsFinderWindow() {
+        let highlightTint = CGRect(x: 400, y: 150, width: 1200, height: 900)
+        let finder = CGRect(x: 400, y: 150, width: 1200, height: 900)
+        let windowList = [
+            windowEntry(pid: ownPID, bounds: highlightTint, number: 7),  // our tint window
+            windowEntry(pid: finderPID, bounds: finder, number: 2),
+        ]
+
+        let target = OverlayWindowService.clickTarget(
+            at: CGPoint(x: 500, y: 400),
+            windowList: windowList,
+            finderPID: finderPID, ownPID: ownPID,
+            mouseThroughWindowNumbers: [7]
+        )
+        XCTAssertEqual(target, .finderWindow(finder))
+    }
+
+    /// Our interactive panels (file drawer, path bar) handle their own clicks —
+    /// the global monitor must not navigate to a Finder window behind them.
+    func testClickOnOwnInteractivePanelIsBlocked() {
+        let drawer = CGRect(x: 450, y: 300, width: 300, height: 400)
+        let finder = CGRect(x: 400, y: 150, width: 1200, height: 900)
+        let windowList = [
+            windowEntry(pid: ownPID, bounds: drawer, number: 9),
+            windowEntry(pid: finderPID, bounds: finder, number: 2),
+        ]
+
+        let target = OverlayWindowService.clickTarget(
+            at: CGPoint(x: 500, y: 400),
+            windowList: windowList,
+            finderPID: finderPID, ownPID: ownPID,
+            mouseThroughWindowNumbers: []  // drawer is not mouse-through
+        )
+        XCTAssertEqual(target, .blocked)
+    }
+
+    func testClickOnBareDesktopResolvesToDesktop() {
+        let dialog = CGRect(x: 500, y: 200, width: 800, height: 600)
+        let windowList = [
+            windowEntry(pid: dialogAppPID, bounds: dialog, number: 1),
+        ]
+
+        let target = OverlayWindowService.clickTarget(
+            at: CGPoint(x: 50, y: 1000),  // outside every window
+            windowList: windowList,
+            finderPID: finderPID, ownPID: ownPID,
+            mouseThroughWindowNumbers: []
+        )
+        XCTAssertEqual(target, .desktop)
+    }
+
+    func testMalformedWindowEntriesAreSkipped() {
+        let finder = CGRect(x: 400, y: 150, width: 1200, height: 900)
+        let windowList: [[String: Any]] = [
+            [:],  // no bounds, no pid
+            [kCGWindowBounds as String: ["X": CGFloat(0)]],  // partial bounds
+            windowEntry(pid: finderPID, bounds: finder, number: 2),
+        ]
+
+        let target = OverlayWindowService.clickTarget(
+            at: CGPoint(x: 500, y: 400),
+            windowList: windowList,
+            finderPID: finderPID, ownPID: ownPID,
+            mouseThroughWindowNumbers: []
+        )
+        XCTAssertEqual(target, .finderWindow(finder))
+    }
 }

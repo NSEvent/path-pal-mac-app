@@ -43,17 +43,39 @@ final class DialogNavigationService {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             guard let self = self, self.generation == token else { return }
 
-            NSLog("[PathPal] Sending Cmd+Shift+G via HID")
-            Self.postKey(code: 5, flags: [.maskCommand, .maskShift]) // G
+            Self.whenPhysicalModifiersReleased { [weak self] in
+                guard let self = self, self.generation == token else { return }
 
-            self.pollForGoToFolderField(
-                pid: pid,
-                path: path,
-                preFocused: preFocused,
-                attempt: 0,
-                token: token
-            )
+                NSLog("[PathPal] Sending Cmd+Shift+G via HID")
+                Self.postKey(code: 5, flags: [.maskCommand, .maskShift]) // G
+
+                self.pollForGoToFolderField(
+                    pid: pid,
+                    path: path,
+                    preFocused: preFocused,
+                    attempt: 0,
+                    token: token
+                )
+            }
         }
+    }
+
+    /// Run `action` once the user's physical modifier keys are up (bounded
+    /// wait, then proceed regardless). Navigation is triggered by gestures
+    /// that involve modifiers — ⌘-click drawer multi-select, ⌃⌥↩ overlay
+    /// selection — and the window server merges physically-held modifiers
+    /// into posted keystrokes. A held ⇧ turned our ⌘A select-all into ⌘⇧A,
+    /// the dialog shortcut for "Go to Applications"; held ⌃⌥ makes our posted
+    /// Return re-trigger the overlay's own ⌃⌥↩ hotkey.
+    private static func whenPhysicalModifiersReleased(attempt: Int = 0, then action: @escaping () -> Void) {
+        let held = NSEvent.modifierFlags.intersection([.command, .shift, .control, .option])
+        if !held.isEmpty && attempt < 30 { // up to ~900 ms
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) {
+                whenPhysicalModifiersReleased(attempt: attempt + 1, then: action)
+            }
+            return
+        }
+        action()
     }
 
     /// Poll the AX tree to find the Go to Folder text field, then set its value.
@@ -93,17 +115,21 @@ final class DialogNavigationService {
                 if result == .success {
                     // Press Return to confirm navigation
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                        NSLog("[PathPal] Pressing Return to confirm")
-                        Self.postKey(code: 36, flags: []) // Return
+                        Self.whenPhysicalModifiersReleased {
+                            NSLog("[PathPal] Pressing Return to confirm")
+                            Self.postKey(code: 36, flags: []) // Return
+                        }
                     }
                 } else {
                     // Fallback: type the path character by character via CGEvent
                     NSLog("[PathPal] AXSetValue failed, falling back to keystroke typing")
-                    Self.postKey(code: 0, flags: [.maskCommand]) // Cmd+A to select all first
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                        Self.typeString(path)
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            Self.postKey(code: 36, flags: []) // Return
+                    Self.whenPhysicalModifiersReleased {
+                        Self.postKey(code: 0, flags: [.maskCommand]) // Cmd+A to select all first
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            Self.typeString(path)
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                Self.postKey(code: 36, flags: []) // Return
+                            }
                         }
                     }
                 }
@@ -149,6 +175,10 @@ final class DialogNavigationService {
                 continue
             }
             down.keyboardSetUnicodeString(stringLength: chunk.count, unicodeString: &chunk)
+            // Freshly created events inherit the current modifier state; a
+            // held modifier would turn typed characters into chords.
+            down.flags = []
+            up.flags = []
             down.post(tap: .cghidEventTap)
             up.post(tap: .cghidEventTap)
         }

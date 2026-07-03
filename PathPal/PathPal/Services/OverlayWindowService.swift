@@ -488,8 +488,9 @@ final class OverlayWindowService {
         stopEventTap()
         stopClickMonitorFallback()
 
-        guard SettingsService.shared.clickFinderWindowToChoose else {
-            debugLog("[PathPal] Finder window click-to-choose disabled")
+        guard SettingsService.shared.clickFinderWindowToChoose
+                || SettingsService.shared.clickDesktopToChoose else {
+            debugLog("[PathPal] Finder window / desktop click-to-choose disabled")
             return
         }
 
@@ -547,7 +548,8 @@ final class OverlayWindowService {
 
     private func checkClickOnFinderWindow(at cgPoint: CGPoint) {
         guard currentDialog != nil else { return }
-        guard SettingsService.shared.clickFinderWindowToChoose else { return }
+        let settings = SettingsService.shared
+        guard settings.clickFinderWindowToChoose || settings.clickDesktopToChoose else { return }
         guard let screen = NSScreen.main else { return }
 
         // Don't intercept clicks on the overlay panel
@@ -558,7 +560,7 @@ final class OverlayWindowService {
             if cgPanelRect.contains(cgPoint) { return }
         }
 
-        if let target = highlightTarget(at: cgPoint) {
+        if settings.clickFinderWindowToChoose, let target = highlightTarget(at: cgPoint) {
             debugLog("Click matched highlighted Finder window: \(target.name) path=\(target.path)")
             DispatchQueue.main.async { [weak self] in
                 self?.hideTooltip()
@@ -567,16 +569,103 @@ final class OverlayWindowService {
             return
         }
 
-        if !highlightWindows.isEmpty { return }
+        // Z-order-correct hit test: only navigate when the clicked point is
+        // genuinely showing that Finder window (or the bare desktop). Raw
+        // bounds containment used to route every click INSIDE the dialog to
+        // whatever Finder window sat behind it — click Save over a hidden
+        // /Applications window and the dialog teleported there.
+        switch resolveClickTarget(at: cgPoint) {
+        case .blocked:
+            return
 
-        // Fallback: raw Finder window bounds (only when highlights are disabled)
-        if let matched = finderWindows.first(where: { $0.bounds.contains(cgPoint) }) {
+        case .desktop:
+            guard settings.clickDesktopToChoose else { return }
+            let desktop = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Desktop").path
+            debugLog("Click on desktop → choosing Desktop folder")
+            DispatchQueue.main.async { [weak self] in
+                self?.hideTooltip()
+                self?.navigateDialog(toPath: desktop)
+            }
+
+        case .finderWindow(let hitBounds):
+            // With highlights up, the tinted regions are the click surface;
+            // raw window matching only serves highlight-less operation.
+            guard settings.clickFinderWindowToChoose, highlightWindows.isEmpty else { return }
+            guard let matched = finderWindows.first(where: {
+                Self.rectsVisuallyEqual($0.bounds, hitBounds, tolerance: 8)
+            }) else { return }
             debugLog("Click matched Finder window: \(matched.name) path=\(matched.path)")
             DispatchQueue.main.async { [weak self] in
                 self?.hideTooltip()
                 self?.navigateDialog(toPath: matched.path)
             }
         }
+    }
+
+    /// What a global click at a screen point (CG coords) actually lands on.
+    enum ClickTarget: Equatable {
+        case finderWindow(CGRect)  // topmost window at the point is a Finder window (its bounds)
+        case desktop               // no window at the point at all
+        case blocked               // some other window is in front (dialog, other app, our panels)
+    }
+
+    /// Resolve what the click at `cgPoint` visually landed on, walking the
+    /// on-screen window list front-to-back. PathPal's mouse-through windows
+    /// (highlight tint, hover tooltip) are transparent to the test; anything
+    /// else in front — the Open/Save dialog itself, another app's window, the
+    /// file drawer — blocks it.
+    private func resolveClickTarget(at cgPoint: CGPoint) -> ClickTarget {
+        guard let windowList = CGWindowListCopyWindowInfo(
+            [.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID
+        ) as? [[String: Any]] else { return .blocked }  // can't verify → fail closed
+        let finderPID = NSRunningApplication
+            .runningApplications(withBundleIdentifier: "com.apple.finder").first?.processIdentifier
+        let mouseThrough = Set(
+            NSApp.windows.filter { $0.isVisible && $0.ignoresMouseEvents }.map(\.windowNumber)
+        )
+        return Self.clickTarget(
+            at: cgPoint,
+            windowList: windowList,
+            finderPID: finderPID,
+            ownPID: ProcessInfo.processInfo.processIdentifier,
+            mouseThroughWindowNumbers: mouseThrough
+        )
+    }
+
+    /// Pure front-to-back hit test over a CGWindowList snapshot (already in
+    /// z-order). Separated from AppKit state for unit testing.
+    static func clickTarget(
+        at point: CGPoint,
+        windowList: [[String: Any]],
+        finderPID: pid_t?,
+        ownPID: pid_t,
+        mouseThroughWindowNumbers: Set<Int>
+    ) -> ClickTarget {
+        for entry in windowList {
+            guard let boundsDict = entry[kCGWindowBounds as String] as? [String: CGFloat],
+                  let x = boundsDict["X"], let y = boundsDict["Y"],
+                  let w = boundsDict["Width"], let h = boundsDict["Height"] else { continue }
+            let bounds = CGRect(x: x, y: y, width: w, height: h)
+            guard bounds.contains(point),
+                  let pidVal = entry[kCGWindowOwnerPID as String] as? Int else { continue }
+
+            if pid_t(pidVal) == ownPID {
+                // Our own windows: clicks pass through the mouse-through ones
+                // (highlights, tooltip); interactive panels handle their own
+                // clicks, so the global monitor must not double-navigate.
+                if let num = entry[kCGWindowNumber as String] as? Int,
+                   mouseThroughWindowNumbers.contains(num) {
+                    continue
+                }
+                return .blocked
+            }
+            if let finderPID, pid_t(pidVal) == finderPID {
+                return .finderWindow(bounds)
+            }
+            return .blocked
+        }
+        return .desktop
     }
 
     private func stopEventTap() {
@@ -874,7 +963,7 @@ final class OverlayWindowService {
         return true
     }
 
-    private static func rectsVisuallyEqual(_ lhs: CGRect, _ rhs: CGRect, tolerance: CGFloat) -> Bool {
+    static func rectsVisuallyEqual(_ lhs: CGRect, _ rhs: CGRect, tolerance: CGFloat) -> Bool {
         abs(lhs.origin.x - rhs.origin.x) <= tolerance
             && abs(lhs.origin.y - rhs.origin.y) <= tolerance
             && abs(lhs.width - rhs.width) <= tolerance

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1 — 2026-07-03
+
+- Fixed: with "Click Finder window to navigate" on, clicks inside the Open/Save dialog could navigate it to a Finder window hidden behind the dialog (e.g. the dialog kept jumping to /Applications). Click-to-choose now checks what's actually on top at the click point.
+- Fixed: dialog navigation keystrokes could combine with modifier keys still held from the triggering gesture (⌘-click, ⌃⌥↩) and fire as chords — one path turned into ⌘⇧A, the "Go to Applications" shortcut. PathPal now waits for a clean keyboard before posting keys.
+- Fixed: on multi-display setups, the overlay, highlights, and click targets were offset when the dialog was on a secondary display.
+- "Click desktop to navigate to ~/Desktop" now works (the setting existed but was never wired up).
+- Polish: proper ellipses and ⌘ key glyphs throughout; overlay panel fits its card exactly; path bar placeholder hints at fuzzy matching.
+
 ## 1.0.0 — 2026-07-01
 
 - First public release — source available on GitHub, signed + notarized builds on Gumroad

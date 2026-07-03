@@ -28,9 +28,18 @@ PROCESS_NAME := $(basename $(WRAPPER_NAME))
 
 .PHONY: build sign install test clean app-path release notarize dmg
 
+# UNIVERSAL=1 forces an arm64+x86_64 build. Release builds need it: the
+# 1.0.0 default came out arm64-only even though ONLY_ACTIVE_ARCH only
+# lives in Debug. Dev builds stay single-arch for speed.
+ifeq ($(UNIVERSAL),1)
+ARCH_SETTINGS := ARCHS=arm64\ x86_64 ONLY_ACTIVE_ARCH=NO
+else
+ARCH_SETTINGS :=
+endif
+
 build:
 	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration $(CONFIG) \
-		DEVELOPMENT_TEAM=$(TEAM_ID) -allowProvisioningUpdates build
+		DEVELOPMENT_TEAM=$(TEAM_ID) $(ARCH_SETTINGS) -allowProvisioningUpdates build
 	$(MAKE) sign TIMESTAMP_FLAG=$(TIMESTAMP_FLAG)
 
 sign:
@@ -75,7 +84,7 @@ app-path:
 
 # Full release: timestamped build, notarize, staple, then zip + DMG in dist/
 release:
-	$(MAKE) build TIMESTAMP_FLAG=--timestamp
+	$(MAKE) build TIMESTAMP_FLAG=--timestamp UNIVERSAL=1
 	$(MAKE) notarize
 	$(MAKE) dmg
 	@echo "Release artifacts:"

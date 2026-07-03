@@ -116,9 +116,9 @@ struct PathBarView: View {
 
             // Hints bar
             HStack(spacing: 12) {
-                hintLabel("Tab", "complete")
-                hintLabel("Enter", "open")
-                hintLabel("Esc", "close")
+                hintLabel("⇥", "complete")
+                hintLabel("↩", "open")
+                hintLabel("esc", "close")
 
                 Spacer()
 
@@ -273,7 +273,7 @@ struct FocusedTextField: NSViewRepresentable {
         field.drawsBackground = false
         field.focusRingType = .none
         field.font = .monospacedSystemFont(ofSize: 16, weight: .regular)
-        field.placeholderString = "Enter path..."
+        field.placeholderString = "Path, or a folder name to fuzzy-match…"
         field.stringValue = text
         field.coordinator = context.coordinator
 

@@ -221,7 +221,7 @@ final class OverlayWindowService {
         }
 
         // Also exclude the overlay sidebar panel
-        if let panel = overlayPanel, let screen = NSScreen.main {
+        if let panel = overlayPanel, let screen = NSScreen.screens.first {
             let pf = panel.frame
             let cgPanelY = screen.frame.height - pf.origin.y - pf.height
             let panelCG = CGRect(x: pf.origin.x, y: cgPanelY, width: pf.width, height: pf.height)
@@ -268,7 +268,7 @@ final class OverlayWindowService {
                 guard let self = self else { return }
                 guard SettingsService.shared.clickFinderWindowToChoose else { return }
                 let mouseLocation = NSEvent.mouseLocation
-                guard let screen = NSScreen.main else { return }
+                guard let screen = NSScreen.screens.first else { return }
                 let cgY = screen.frame.height - mouseLocation.y
                 let cgPoint = CGPoint(x: mouseLocation.x, y: cgY)
 
@@ -533,7 +533,7 @@ final class OverlayWindowService {
         clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
             guard let self = self else { return }
             let mouseLocation = NSEvent.mouseLocation
-            guard let screen = NSScreen.main else { return }
+            guard let screen = NSScreen.screens.first else { return }
             let cgY = screen.frame.height - mouseLocation.y
             let cgPoint = CGPoint(x: mouseLocation.x, y: cgY)
             self.checkClickOnFinderWindow(at: cgPoint)
@@ -550,7 +550,7 @@ final class OverlayWindowService {
         guard currentDialog != nil else { return }
         let settings = SettingsService.shared
         guard settings.clickFinderWindowToChoose || settings.clickDesktopToChoose else { return }
-        guard let screen = NSScreen.main else { return }
+        guard let screen = NSScreen.screens.first else { return }
 
         // Don't intercept clicks on the overlay panel
         if let panel = overlayPanel {
@@ -719,7 +719,7 @@ final class OverlayWindowService {
         }
 
         let mouseLocation = NSEvent.mouseLocation
-        guard let screen = NSScreen.main else { return }
+        guard let screen = NSScreen.screens.first else { return }
         let cgY = screen.frame.height - mouseLocation.y
         let cgPoint = CGPoint(x: mouseLocation.x, y: cgY)
 
@@ -1007,7 +1007,7 @@ final class OverlayWindowService {
             x = dialogBounds.origin.x + dialogBounds.width + 10
         }
 
-        if let screen = NSScreen.main {
+        if let screen = NSScreen.screens.first {
             let cocoaY = screen.frame.height - y - panelHeight
             let frame = NSRect(x: x, y: cocoaY, width: panelWidth, height: panelHeight)
             debugLog("positionOverlay: panel frame = (\(frame.origin.x), \(frame.origin.y), \(frame.width), \(frame.height))")

@@ -107,7 +107,7 @@ struct OverlayPanelView: View {
         VStack(alignment: .leading, spacing: 0) {
             // Header
             HStack {
-                Text(dialogType == .open ? "Open in..." : "Save to...")
+                Text(dialogType == .open ? "Open from…" : "Save to…")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.primary)
                 Spacer()
@@ -184,7 +184,10 @@ struct OverlayPanelView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 4)
         }
-        .frame(width: 250, height: 370)
+        // Must match OverlayPanel's 260×400 content rect exactly — a smaller
+        // fixed frame centers inside the hosting view and leaves a transparent
+        // gutter around the card.
+        .frame(width: 260, height: 400)
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .onAppear {

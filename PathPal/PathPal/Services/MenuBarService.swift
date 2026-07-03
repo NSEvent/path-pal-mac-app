@@ -62,7 +62,7 @@ final class MenuBarService: NSObject, NSMenuDelegate {
             // Add lazy-loaded children submenu
             let childMenu = NSMenu()
             childMenu.delegate = self
-            childMenu.addItem(NSMenuItem(title: "Loading...", action: nil, keyEquivalent: ""))
+            childMenu.addItem(NSMenuItem(title: "Loading…", action: nil, keyEquivalent: ""))
             item.submenu = childMenu
             item.tag = 1
             quickAccessSubmenu.addItem(item)
@@ -83,7 +83,7 @@ final class MenuBarService: NSObject, NSMenuDelegate {
                 item.toolTip = fav.path
                 let childMenu = NSMenu()
                 childMenu.delegate = self
-                childMenu.addItem(NSMenuItem(title: "Loading...", action: nil, keyEquivalent: ""))
+                childMenu.addItem(NSMenuItem(title: "Loading…", action: nil, keyEquivalent: ""))
                 item.submenu = childMenu
                 item.tag = 1
                 favoritesSubmenu.addItem(item)
@@ -110,7 +110,7 @@ final class MenuBarService: NSObject, NSMenuDelegate {
 
                 let childMenu = NSMenu()
                 childMenu.delegate = self
-                childMenu.addItem(NSMenuItem(title: "Loading...", action: nil, keyEquivalent: ""))
+                childMenu.addItem(NSMenuItem(title: "Loading…", action: nil, keyEquivalent: ""))
                 item.submenu = childMenu
                 item.tag = 1
 
@@ -142,7 +142,11 @@ final class MenuBarService: NSObject, NSMenuDelegate {
 
         menu.addItem(.separator())
 
-        let pathBarItem = NSMenuItem(title: "Go to Folder...", action: #selector(showPathBar), keyEquivalent: "")
+        // ⌘L badge documents the global hotkey (armed while Finder or a
+        // dialog is frontmost); as a key equivalent it only fires while the
+        // menu is open.
+        let pathBarItem = NSMenuItem(title: "Go to Folder…", action: #selector(showPathBar), keyEquivalent: "l")
+        pathBarItem.keyEquivalentModifierMask = [.command]
         pathBarItem.target = self
         menu.addItem(pathBarItem)
 
@@ -158,11 +162,11 @@ final class MenuBarService: NSObject, NSMenuDelegate {
 
         menu.addItem(.separator())
 
-        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ",")
+        let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         settingsItem.target = self
         menu.addItem(settingsItem)
 
-        let updatesItem = NSMenuItem(title: "Check for Updates...", action: #selector(checkForUpdates), keyEquivalent: "")
+        let updatesItem = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
         updatesItem.target = self
         menu.addItem(updatesItem)
 
@@ -215,7 +219,7 @@ final class MenuBarService: NSObject, NSMenuDelegate {
             if isDir && depth < 1 {
                 let childMenu = NSMenu()
                 childMenu.delegate = self
-                childMenu.addItem(NSMenuItem(title: "Loading...", action: nil, keyEquivalent: ""))
+                childMenu.addItem(NSMenuItem(title: "Loading…", action: nil, keyEquivalent: ""))
                 item.submenu = childMenu
                 item.tag = 1
             }

@@ -69,8 +69,11 @@ final class HighlightWindow: NSPanel {
         let color = HighlightColor.forIndex(colorIndex)
         self.color = color
 
-        // Convert from CGWindowList coords (top-left origin) to Cocoa coords (bottom-left origin)
-        let screenFrame = NSScreen.main?.frame ?? .zero
+        // Convert from CGWindowList coords (top-left origin) to Cocoa coords
+        // (bottom-left origin). CG global coordinates are anchored at the
+        // PRIMARY screen's top-left, so the conversion must use screens.first
+        // — NSScreen.main is whichever screen has the key window.
+        let screenFrame = NSScreen.screens.first?.frame ?? .zero
         let cocoaY = screenFrame.height - finderWindow.bounds.origin.y - finderWindow.bounds.height
 
         let frame = NSRect(

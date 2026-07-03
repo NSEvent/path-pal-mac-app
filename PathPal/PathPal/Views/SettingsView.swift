@@ -81,7 +81,7 @@ struct SettingsView: View {
 
                 settingsCard(icon: "command", iconColor: .orange, title: "Keyboard") {
                     VStack(alignment: .leading, spacing: 10) {
-                        settingsToggle("Cmd+L path bar (Finder & dialogs)", isOn: Binding(
+                        settingsToggle("⌘L path bar (Finder & dialogs)", isOn: Binding(
                             get: { settings.pathBarHotKeyEnabled },
                             set: {
                                 settings.pathBarHotKeyEnabled = $0
@@ -89,14 +89,14 @@ struct SettingsView: View {
                             }
                         ))
                         VStack(alignment: .leading, spacing: 2) {
-                            settingsToggle("Cmd+Return opens folders / Quick Looks files in Finder", isOn: Binding(
+                            settingsToggle("⌘↩ opens folders / Quick Looks files in Finder", isOn: Binding(
                                 get: { settings.finderOpenFolderHotKeyEnabled },
                                 set: {
                                     settings.finderOpenFolderHotKeyEnabled = $0
                                     NotificationCenter.default.post(name: .pathPalHotKeysChanged, object: nil)
                                 }
                             ))
-                            Text("Arrow-key to an item, then Cmd+Return: open a folder in place, or Quick Look a file — browse without the mouse.")
+                            Text("Arrow-key to an item, then ⌘↩: open a folder in place, or Quick Look a file—browse without the mouse.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
